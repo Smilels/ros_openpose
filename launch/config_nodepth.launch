@@ -31,7 +31,7 @@ Date: 2019/11/23
   <arg name="rviz" default="false" />
 
   <!-- note that the following parameters are going to assigned by other launch file upon call. -->
-  <arg name="print" default="" />
+  <arg name="print_keypoints" default="" />
   <arg name="pub_topic" default="" />
   <arg name="pointcloud" default="" />
   <arg name="id_text_size" default="" />
@@ -40,7 +40,7 @@ Date: 2019/11/23
   <arg name="skeleton_line_width" default="" />
 
   <include file="$(find ros_openpose)/launch/core.launch" >
-    <arg name="print" value="$(arg print)" />
+    <arg name="print_keypoints" value="$(arg print_keypoints)" />
     <arg name="no_depth" value="$(arg no_depth)" />
     <arg name="skeleton" value="$(arg skeleton)" />
     <arg name="frame_id" value="$(arg frame_id)" />

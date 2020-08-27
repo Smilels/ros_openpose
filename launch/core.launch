@@ -7,7 +7,7 @@ Date: 2020/03/02
 -->
 <launch>
   <!-- note that the following parameters are going to assigned by other launch file upon call. -->
-  <arg name="print" default="" />
+  <arg name="print_keypoints" default="" />
   <arg name="frame_id" default="" />
   <arg name="no_depth" default="" />
   <arg name="skeleton" default="" />
@@ -22,7 +22,8 @@ Date: 2020/03/02
   <arg name="skeleton_line_width" default="" />
 
   <!-- invoke rosOpenpose node -->
-  <node name="rosOpenpose" pkg="ros_openpose" type="rosOpenpose" output="screen" required="true" args="$(arg openpose_args)" >
+  <node name="rosOpenpose" pkg="ros_openpose" type="rosOpenpose" output="screen" required="true" args="$(arg openpose_args)">
+    <param name="print_keypoints" value="$(arg print_keypoints)" />
     <param name="frame_id" value="$(arg frame_id)" />
     <param name="no_depth" value="$(arg no_depth)" />
     <param name="pub_topic" value="$(arg pub_topic)" />
@@ -32,7 +33,7 @@ Date: 2020/03/02
   </node>
 
   <!-- invoke visualizer node -->
-  <group unless="$(arg no_depth)" >
+  <!-- <group unless="$(arg no_depth)" >
     <group if="$(arg skeleton)" >
       <node name="visualizer" pkg="ros_openpose" type="visualizer.py" output="screen" >
         <param name="frame_id" value="$(arg frame_id)" />
@@ -43,12 +44,12 @@ Date: 2020/03/02
         <param name="skeleton_line_width" value="$(arg skeleton_line_width)" />
       </node>
     </group>
-  </group>
+  </group> -->
 
  <!-- print ros message to terminal -->
-  <group if="$(arg print)" >
+  <!-- <group if="$(arg print)" >
     <node name="echo" pkg="ros_openpose" type="echo.py" output="screen" required="true" >
       <param name="pub_topic" value="$(arg pub_topic)" />
     </node>
-  </group>
+  </group> -->
 </launch>

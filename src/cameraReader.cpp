@@ -85,6 +85,9 @@ namespace ros_openpose
       mDepthImage = (depthMsg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) ?
                         depthPtr->image * 0.001f : // convert to meter (SI units)
                         depthPtr->image; // no conversion needed
+
+      // normalize the depth image and change the encoding type to 32float, to show the depth image
+      cv::normalize(mDepthImage, mDepthImage, 1, 0, cv::NORM_MINMAX, CV_32F);
     }
     catch (cv_bridge::Exception& e)
     {

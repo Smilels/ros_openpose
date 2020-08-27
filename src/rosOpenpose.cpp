@@ -70,12 +70,13 @@ public:
           auto& datumPtr = datumsPtr->at(0);
           datumPtr = std::make_shared<op::Datum>();
 
-// fill the datum
-#if OPENPOSE1POINT6_OR_HIGHER
-          datumPtr->cvInputData = OP_CV2OPCONSTMAT(colorImage);
-#else
-          datumPtr->cvInputData = colorImage;
-#endif
+          // fill the datum
+          #if OPENPOSE1POINT6_OR_HIGHER
+                    datumPtr->cvInputData = OP_CV2OPCONSTMAT(colorImage);
+          #else
+                    datumPtr->cvInputData = colorImage;
+          #endif
+
           return datumsPtr;
         }
         else
@@ -110,8 +111,8 @@ public:
   // clang-format off
   WUserOutput(const ros::Publisher& framePublisher,
               const std::shared_ptr<ros_openpose::CameraReader>& sPtrCameraReader,
-              const std::string& frameId, const bool noDepth)
-    : mFramePublisher(framePublisher), mSPtrCameraReader(sPtrCameraReader), mNoDepth(noDepth)
+              const std::string& frameId, const bool noDepth, const bool printKeypoints)
+    : mFramePublisher(framePublisher), mSPtrCameraReader(sPtrCameraReader), mNoDepth(noDepth), mprintKeypoints(printKeypoints)
   {
     mFrame.header.frame_id = frameId;
   }
@@ -230,6 +231,8 @@ public:
         }
 
         mFramePublisher.publish(mFrame);
+        if (mprintKeypoints)
+          printKeypoints(datumsPtr);
       }
       else
       {
@@ -245,8 +248,69 @@ public:
     }
   }
 
+  void printKeypoints(const std::shared_ptr<std::vector<std::shared_ptr<op::Datum>>>& datumsPtr)
+  {
+      // Example: How to use the pose keypoints
+      if (datumsPtr != nullptr && !datumsPtr->empty())
+      {
+          op::opLog("\nKeypoints:");
+          // Accesing each element of the keypoints
+          const auto& poseKeypoints = datumsPtr->at(0)->poseKeypoints;
+          op::opLog("Person pose keypoints:");
+          for (auto person = 0 ; person < poseKeypoints.getSize(0) ; person++)
+          {
+              op::opLog("Person " + std::to_string(person) + " (x, y, score):");
+              for (auto bodyPart = 0 ; bodyPart < poseKeypoints.getSize(1) ; bodyPart++)
+              {
+                  std::string valueToPrint;
+                  for (auto xyscore = 0 ; xyscore < poseKeypoints.getSize(2) ; xyscore++)
+                  {
+                      valueToPrint += std::to_string(   poseKeypoints[{person, bodyPart, xyscore}]   ) + " ";
+                  }
+                  op::opLog(valueToPrint);
+              }
+          }
+          op::opLog(" ");
+          // Alternative: just getting std::string equivalent
+          if(FLAGS_face)
+          {
+              op::opLog("Face keypoints: " + datumsPtr->at(0)->faceKeypoints.toString(), op::Priority::High);
+          }
+          if(FLAGS_hand)
+          {
+              op::opLog("Left hand keypoints: " + datumsPtr->at(0)->handKeypoints[0].toString(), op::Priority::High);
+              op::opLog("Right hand keypoints: " + datumsPtr->at(0)->handKeypoints[1].toString(), op::Priority::High);
+          }
+          // Heatmaps
+          const auto& poseHeatMaps = datumsPtr->at(0)->poseHeatMaps;
+          if (!poseHeatMaps.empty())
+          {
+              op::opLog("Pose heatmaps size: [" + std::to_string(poseHeatMaps.getSize(0)) + ", "
+                      + std::to_string(poseHeatMaps.getSize(1)) + ", "
+                      + std::to_string(poseHeatMaps.getSize(2)) + "]");
+              const auto& faceHeatMaps = datumsPtr->at(0)->faceHeatMaps;
+              op::opLog("Face heatmaps size: [" + std::to_string(faceHeatMaps.getSize(0)) + ", "
+                      + std::to_string(faceHeatMaps.getSize(1)) + ", "
+                      + std::to_string(faceHeatMaps.getSize(2)) + ", "
+                      + std::to_string(faceHeatMaps.getSize(3)) + "]");
+              const auto& handHeatMaps = datumsPtr->at(0)->handHeatMaps;
+              op::opLog("Left hand heatmaps size: [" + std::to_string(handHeatMaps[0].getSize(0)) + ", "
+                      + std::to_string(handHeatMaps[0].getSize(1)) + ", "
+                      + std::to_string(handHeatMaps[0].getSize(2)) + ", "
+                      + std::to_string(handHeatMaps[0].getSize(3)) + "]");
+              op::opLog("Right hand heatmaps size: [" + std::to_string(handHeatMaps[1].getSize(0)) + ", "
+                      + std::to_string(handHeatMaps[1].getSize(1)) + ", "
+                      + std::to_string(handHeatMaps[1].getSize(2)) + ", "
+                      + std::to_string(handHeatMaps[1].getSize(3)) + "]");
+          }
+      }
+      else
+          op::opLog("Nullptr or empty datumsPtr found.", op::Priority::High);
+  }
+
 private:
   const bool mNoDepth;
+  const bool mprintKeypoints;
   ros_openpose::Frame mFrame;
   const ros::Publisher mFramePublisher;
   const std::shared_ptr<ros_openpose::CameraReader> mSPtrCameraReader;
@@ -256,7 +320,7 @@ private:
 void configureOpenPose(op::Wrapper& opWrapper,
                        const std::shared_ptr<ros_openpose::CameraReader>& cameraReader,
                        const ros::Publisher& framePublisher,
-                       const std::string& frameId, const bool noDepth)
+                       const std::string& frameId, const bool noDepth, const bool printKeypoints)
 // clang-format on
 {
   try
@@ -344,7 +408,7 @@ void configureOpenPose(op::Wrapper& opWrapper,
 
     // Initializing the user custom classes
     auto wUserInput = std::make_shared<WUserInput>(cameraReader);
-    auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, cameraReader, frameId, noDepth);
+    auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, cameraReader, frameId, noDepth, printKeypoints);
 
     // Add custom processing
     const auto workerInputOnNewThread = true;
@@ -497,7 +561,7 @@ int main(int argc, char* argv[])
   ros::NodeHandle nh("~");
 
   // define the parameters, we are going to read
-  bool noDepth;
+  bool noDepth, printKeypoints;
   std::string colorTopic, depthTopic, camInfoTopic, frameId, pubTopic;
 
   // read the parameters from relative nodel handle
@@ -507,6 +571,7 @@ int main(int argc, char* argv[])
   nh.getParam("color_topic", colorTopic);
   nh.getParam("depth_topic", depthTopic);
   nh.getParam("cam_info_topic", camInfoTopic);
+  nh.param("print_keypoints", printKeypoints, false);
 
   if (pubTopic.empty())
   {
@@ -526,7 +591,7 @@ int main(int argc, char* argv[])
   {
     ROS_INFO("Starting ros_openpose...");
     op::Wrapper opWrapper;
-    configureOpenPose(opWrapper, cameraReader, framePublisher, frameId, noDepth);
+    configureOpenPose(opWrapper, cameraReader, framePublisher, frameId, noDepth, printKeypoints);
 
     // start and run
     opWrapper.start();
