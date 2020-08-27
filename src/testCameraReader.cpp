@@ -18,6 +18,9 @@ void show(sPtrCameraReader readers)
     auto colorImage = readers->getColorFrame();
     auto depthImage = readers->getDepthFrame();
 
+    // normalize the depth image and change the encoding type to 32float, to show the depth image
+    cv::normalize(depthImage, depthImage, 1, 0, cv::NORM_MINMAX, CV_32F);
+
     if (!colorImage.empty())
       cv::imshow("color image", colorImage);
     else
