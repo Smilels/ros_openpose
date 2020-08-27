@@ -33,7 +33,7 @@ Date: 2020/03/02
   </node>
 
   <!-- invoke visualizer node -->
-  <!-- <group unless="$(arg no_depth)" >
+  <group unless="$(arg no_depth)" >
     <group if="$(arg skeleton)" >
       <node name="visualizer" pkg="ros_openpose" type="visualizer.py" output="screen" >
         <param name="frame_id" value="$(arg frame_id)" />
@@ -44,7 +44,7 @@ Date: 2020/03/02
         <param name="skeleton_line_width" value="$(arg skeleton_line_width)" />
       </node>
     </group>
-  </group> -->
+  </group>
 
  <!-- print ros message to terminal -->
   <!-- <group if="$(arg print)" >

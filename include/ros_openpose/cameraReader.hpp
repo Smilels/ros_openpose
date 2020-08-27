@@ -141,6 +141,7 @@ namespace ros_openpose
       point[0] = depth * x;
       point[1] = depth * y;
       point[2] = depth;
+      // todo: why depth is always 1.0
     }
   };
 }

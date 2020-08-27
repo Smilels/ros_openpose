@@ -146,6 +146,12 @@ public:
       mFrame.persons[person].bodyParts[bodyPart].point.x = point3D[0];
       mFrame.persons[person].bodyParts[bodyPart].point.y = point3D[1];
       mFrame.persons[person].bodyParts[bodyPart].point.z = point3D[2];
+
+      if (bodyPart == 4)
+      {
+        std::cout<< "right wrist, x: " << point3D[0] << "y: "<<  point3D[1] << "z: "<< point3D[2] <<std::endl;
+        std::cout<< "right wrist, pixel x: " << x << "y: "<<  y <<std::endl;
+      }
     }
   }
 
