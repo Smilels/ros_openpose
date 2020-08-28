@@ -19,6 +19,9 @@
 #include <ros_openpose/Frame.h>
 #include <ros_openpose/cameraReader.hpp>
 
+#include <std_msgs/Float64MultiArray.h>
+
+
 // define a macro for compatibility with older versions
 #define OPENPOSE1POINT6_OR_HIGHER OpenPose_VERSION_MAJOR >= 1 && OpenPose_VERSION_MINOR >= 6
 
@@ -109,10 +112,10 @@ class WUserOutput : public op::WorkerConsumer<sPtrVecSPtrDatum>
 {
 public:
   // clang-format off
-  WUserOutput(const ros::Publisher& framePublisher,
+  WUserOutput(const ros::Publisher& framePublisher,const ros::Publisher& handPublisher,
               const std::shared_ptr<ros_openpose::CameraReader>& sPtrCameraReader,
               const std::string& frameId, const bool noDepth, const bool printKeypoints)
-    : mFramePublisher(framePublisher), mSPtrCameraReader(sPtrCameraReader), mNoDepth(noDepth), mprintKeypoints(printKeypoints)
+    : mFramePublisher(framePublisher), mHandPublisher(handPublisher), mSPtrCameraReader(sPtrCameraReader), mNoDepth(noDepth), mprintKeypoints(printKeypoints)
   {
     mFrame.header.frame_id = frameId;
   }
@@ -151,6 +154,10 @@ public:
       {
         std::cout<< "right wrist, x: " << point3D[0] << "y: "<<  point3D[1] << "z: "<< point3D[2] <<std::endl;
         std::cout<< "right wrist, pixel x: " << x << "y: "<<  y <<std::endl;
+        std_msgs::Float64MultiArray handmsg;
+        for (auto it = 0; it<3; it++)
+           handmsg.data.push_back(point3D[it]);
+        mHandPublisher.publish(handmsg);
       }
     }
   }
@@ -318,7 +325,7 @@ private:
   const bool mNoDepth;
   const bool mprintKeypoints;
   ros_openpose::Frame mFrame;
-  const ros::Publisher mFramePublisher;
+  const ros::Publisher mFramePublisher, mHandPublisher;
   const std::shared_ptr<ros_openpose::CameraReader> mSPtrCameraReader;
 };
 
@@ -326,6 +333,7 @@ private:
 void configureOpenPose(op::Wrapper& opWrapper,
                        const std::shared_ptr<ros_openpose::CameraReader>& cameraReader,
                        const ros::Publisher& framePublisher,
+                       const ros::Publisher& handPublisher,
                        const std::string& frameId, const bool noDepth, const bool printKeypoints)
 // clang-format on
 {
@@ -414,7 +422,7 @@ void configureOpenPose(op::Wrapper& opWrapper,
 
     // Initializing the user custom classes
     auto wUserInput = std::make_shared<WUserInput>(cameraReader);
-    auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, cameraReader, frameId, noDepth, printKeypoints);
+    auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, handPublisher, cameraReader, frameId, noDepth, printKeypoints);
 
     // Add custom processing
     const auto workerInputOnNewThread = true;
@@ -592,12 +600,13 @@ int main(int argc, char* argv[])
 
   // the frame consists of the location of detected body parts of each person
   const ros::Publisher framePublisher = nh.advertise<ros_openpose::Frame>(pubTopic, 1);
+  const ros::Publisher handPublisher = nh.advertise<std_msgs::Float64MultiArray>("right_hand_point", 1);
 
   try
   {
     ROS_INFO("Starting ros_openpose...");
     op::Wrapper opWrapper;
-    configureOpenPose(opWrapper, cameraReader, framePublisher, frameId, noDepth, printKeypoints);
+    configureOpenPose(opWrapper, cameraReader, framePublisher, handPublisher, frameId, noDepth, printKeypoints);
 
     // start and run
     opWrapper.start();

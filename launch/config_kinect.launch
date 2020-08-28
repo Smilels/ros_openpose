@@ -8,15 +8,20 @@ Date: 2019/11/23
 <launch>
   <!-- rostopic to subscribe for color images -->
   <arg name="color_topic" default="/kinect2/sd/image_color_rect" />
+  <!-- <arg name="color_topic" default="/kinect2/qhd/image_color_rect" /> -->
 
   <!-- rostopic to subscribe for depth images -->
   <arg name="depth_topic" default="/kinect2/sd/image_depth" />
+  <!-- <arg name="depth_topic" default="/kinect2/qhd/image_depth_rect" /> -->
 
   <!-- rostopic to subscribe for camera calibration parameters -->
   <arg name="cam_info_topic" default="/kinect2/sd/camera_info" />
+  <!-- <arg name="cam_info_topic" default="/kinect2/qhd/camera_info" /> -->
 
   <!-- frame id for point cloud and 3D skeleton data -->
-  <arg name="frame_id" default="kinect2_ir_optical_frame" />
+  <!-- in TAMS setup, we should add "head_mount_" -->
+  <arg name="frame_id" default="head_mount_kinect2_ir_optical_frame" />
+  <!-- <arg name="frame_id" default="head_mount_kinect2_rgb_optical_frame" /> -->
 
   <!-- kinect camera provide depth information.
   hence unset the flag. -->
@@ -51,9 +56,9 @@ Date: 2019/11/23
   </include>
 
   <!-- invoke kinect2 camera ros package -->
-  <include file="$(find kinect2_bridge)/launch/kinect2_bridge.launch" >
+  <!-- <include file="$(find kinect2_bridge)/launch/kinect2_bridge.launch" >
     <arg name="publish_tf" value="true" />
-  </include>
+  </include> -->
 
   <!-- invoke rviz -->
   <group if="$(arg rviz)" >
