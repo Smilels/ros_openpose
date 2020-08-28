@@ -82,9 +82,13 @@ namespace ros_openpose
       // however I found that it is only changing encoding.
       // therefore in case of '16UC1' encoding (depth values are in millimeter),
       // a manually conversion from millimeter to meter is required.
-      mDepthImage = (depthMsg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) ?
-                        depthPtr->image * 0.001f : // convert to meter (SI units)
-                        depthPtr->image; // no conversion needed
+
+      mDepthImage = depthPtr->image;
+
+      // in kinetic, multiply * 0.001f cannot work, it will output 0 or 1
+      // (depthMsg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) ?
+      //                   depthPtr->image * 0.001f : // convert to meter (SI units)
+      //                   depthPtr->image; // no conversion needed
     }
     catch (cv_bridge::Exception& e)
     {

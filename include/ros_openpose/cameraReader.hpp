@@ -23,6 +23,7 @@
 #include <mutex>
 #include <vector>
 
+
 // define a few datatype
 typedef unsigned long long ullong;
 
@@ -117,10 +118,16 @@ namespace ros_openpose
       // our depth frame type is 16UC1 which has unsigned short as an underlying type
       auto depth = mDepthImageUsed.at<unsigned short>(static_cast<int>(pixelY), static_cast<int>(pixelX));
 
+      // 2 means CV_16UC1
+      // we need to change depth to float, otherwise, the depth will go to a int 1 or 0
+      float depth_;
+      if (mDepthImageUsed.type() == 2)
+          depth_ = depth * 0.001f;
+
       // no need to proceed further if the depth is zero or less than zero
       // the depth represents the distance of an object placed infront of the camera
       // therefore depth must always be a positive number
-      if (depth <= 0)
+      if (depth_ <= 0)
         return;
 
       // the following calculation can also be done by image_geometry
@@ -138,10 +145,9 @@ namespace ros_openpose
       auto x = (pixelX - mSPtrCameraInfo->K.at(2)) / mSPtrCameraInfo->K.at(0);
       auto y = (pixelY - mSPtrCameraInfo->K.at(5)) / mSPtrCameraInfo->K.at(4);
 
-      point[0] = depth * x;
-      point[1] = depth * y;
-      point[2] = depth;
-      // todo: why depth is always 1.0
+      point[0] = depth_ * x;
+      point[1] = depth_ * y;
+      point[2] = depth_;
     }
   };
 }
