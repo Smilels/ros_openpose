@@ -152,8 +152,8 @@ public:
 
       if (bodyPart == 4)
       {
-        std::cout<< "right wrist, x: " << point3D[0] << "y: "<<  point3D[1] << "z: "<< point3D[2] <<std::endl;
-        std::cout<< "right wrist, pixel x: " << x << "y: "<<  y <<std::endl;
+        // std::cout<< "right wrist, x: " << point3D[0] << "y: "<<  point3D[1] << "z: "<< point3D[2] <<std::endl;
+        // std::cout<< "right wrist, pixel x: " << x << "y: "<<  y <<std::endl;
         std_msgs::Float64MultiArray handmsg;
         for (auto it = 0; it<3; it++)
            handmsg.data.push_back(point3D[it]);
