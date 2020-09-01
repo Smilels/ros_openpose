@@ -8,10 +8,12 @@
 
 // ROS headers
 #include <ros/ros.h>
+
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/image_encodings.h>
 #include <message_filters/subscriber.h>
-#include <message_filters/time_synchronizer.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/exact_time.h>
 
 // CV brigge header
 #include <cv_bridge/cv_bridge.h>
@@ -26,6 +28,7 @@
 
 // define a few datatype
 typedef unsigned long long ullong;
+typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image> MySyncPolicy;
 
 namespace ros_openpose
 {
@@ -41,6 +44,12 @@ namespace ros_openpose
     ros::Subscriber mColorImgSubscriber;
     ros::Subscriber mDepthImgSubscriber;
 
+   // ros::Publisher handPublisher;
+
+    boost::shared_ptr<message_filters::Subscriber<sensor_msgs::Image> > mColorImgSubscriber_filter;
+    boost::shared_ptr<message_filters::Subscriber<sensor_msgs::Image> > mDepthImgSubscriber_filter;
+    boost::shared_ptr<message_filters::Synchronizer<MySyncPolicy> > sync;
+
     ullong mFrameNumber = 0ULL;
 
     // camera calibration parameters
@@ -50,6 +59,8 @@ namespace ros_openpose
     void camInfoCallback(const sensor_msgs::CameraInfoConstPtr& camMsg);
     void colorImgCallback(const sensor_msgs::ImageConstPtr& colorMsg);
     void depthImgCallback(const sensor_msgs::ImageConstPtr& depthMsg);
+    void callback(const sensor_msgs::ImageConstPtr& colorMsg, const sensor_msgs::ImageConstPtr& depthMsg);
+
 
   public:
     // we don't want to instantiate using deafult constructor
@@ -95,6 +106,7 @@ namespace ros_openpose
       mMutex.lock();
       mDepthImageUsed = mDepthImage;
       mMutex.unlock();
+
       return mDepthImageUsed;
     }
 
@@ -108,7 +120,7 @@ namespace ros_openpose
     }
 
     // compute the point in 3D space for a given pixel without considering distortion
-    void compute3DPoint(const float pixelX, const float pixelY, float (&point)[3])
+    void computeMedium3DPoint(const float pixelX, const float pixelY, float (&point)[3])
     {
       // K.at(0) = intrinsic.fx
       // K.at(4) = intrinsic.fy
@@ -157,46 +169,46 @@ namespace ros_openpose
     }
 
     // compute the point in 3D space for a given pixel without considering distortion
-    // void compute3DPoint(const float pixelX, const float pixelY, float (&point)[3])
-    // {
-    //   // K.at(0) = intrinsic.fx
-    //   // K.at(4) = intrinsic.fy
-    //   // K.at(2) = intrinsic.ppx
-    //   // K.at(5) = intrinsic.ppy
-    //
-    //   // our depth frame type is 16UC1 which has unsigned short as an underlying type
-    //   auto depth = mDepthImageUsed.at<unsigned short>(static_cast<int>(pixelY), static_cast<int>(pixelX));
-    //
-    //   // 2 means CV_16UC1
-    //   // we need to change depth to float, otherwise, the depth will go to a int 1 or 0
-    //   float depth_;
-    //   if (mDepthImageUsed.type() == 2)
-    //       depth_ = depth * 0.001f;
-    //
-    //   // no need to proceed further if the depth is zero or less than zero
-    //   // the depth represents the distance of an object placed infront of the camera
-    //   // therefore depth must always be a positive number
-    //   if (depth_ <= 0)
-    //     return;
-    //
-    //   // the following calculation can also be done by image_geometry
-    //   // for example:
-    //   // image_geometry::PinholeCameraModel camModel;
-    //   // camModel.fromCameraInfo(mSPtrCameraInfo);
-    //   // cv::Point2d depthPixel(pixelX, pixelY);
-    //   // auto point3d = camModel.projectPixelTo3dRay(depthPixel)
-    //   // auto depth = mDepthImageUsed.at<unsigned short>(depthPixel);
-    //   // point[0] = depth * point3d.x;
-    //   // point[1] = depth * point3d.y;
-    //   // point[2] = depth * point3d.z;
-    //   // for more info., please see http://wiki.ros.org/image_geometry
-    //
-    //   auto x = (pixelX - mSPtrCameraInfo->K.at(2)) / mSPtrCameraInfo->K.at(0);
-    //   auto y = (pixelY - mSPtrCameraInfo->K.at(5)) / mSPtrCameraInfo->K.at(4);
-    //
-    //   point[0] = depth_ * x;
-    //   point[1] = depth_ * y;
-    //   point[2] = depth_;
-    // }
+    void compute3DPoint(const float pixelX, const float pixelY, float (&point)[3])
+    {
+      // K.at(0) = intrinsic.fx
+      // K.at(4) = intrinsic.fy
+      // K.at(2) = intrinsic.ppx
+      // K.at(5) = intrinsic.ppy
+
+      // our depth frame type is 16UC1 which has unsigned short as an underlying type
+      auto depth = mDepthImageUsed.at<unsigned short>(static_cast<int>(pixelY), static_cast<int>(pixelX));
+
+      // 2 means CV_16UC1
+      // we need to change depth to float, otherwise, the depth will go to a int 1 or 0
+      float depth_;
+      if (mDepthImageUsed.type() == 2)
+          depth_ = depth * 0.001f;
+
+      // no need to proceed further if the depth is zero or less than zero
+      // the depth represents the distance of an object placed infront of the camera
+      // therefore depth must always be a positive number
+      if (depth_ <= 0)
+        return;
+
+      // the following calculation can also be done by image_geometry
+      // for example:
+      // image_geometry::PinholeCameraModel camModel;
+      // camModel.fromCameraInfo(mSPtrCameraInfo);
+      // cv::Point2d depthPixel(pixelX, pixelY);
+      // auto point3d = camModel.projectPixelTo3dRay(depthPixel)
+      // auto depth = mDepthImageUsed.at<unsigned short>(depthPixel);
+      // point[0] = depth * point3d.x;
+      // point[1] = depth * point3d.y;
+      // point[2] = depth * point3d.z;
+      // for more info., please see http://wiki.ros.org/image_geometry
+
+      auto x = (pixelX - mSPtrCameraInfo->K.at(2)) / mSPtrCameraInfo->K.at(0);
+      auto y = (pixelY - mSPtrCameraInfo->K.at(5)) / mSPtrCameraInfo->K.at(4);
+
+      point[0] = depth_ * x;
+      point[1] = depth_ * y;
+      point[2] = depth_;
+    }
   };
 }

@@ -39,12 +39,44 @@ namespace ros_openpose
   }
 
   // we define the subscriber here. we are using TimeSynchronizer filter to receive the synchronized data
+  // we define the subscriber here. we are using TimeSynchronizer filter to receive the synchronized data
   inline void CameraReader::subscribe()
   {
+    // handPublisher = mNh.advertise<std_msgs::Float64>("test", 1);
+
+    mColorImgSubscriber_filter.reset( new message_filters::Subscriber<sensor_msgs::Image>( mNh, mColorTopic,1));
+    mDepthImgSubscriber_filter.reset( new message_filters::Subscriber<sensor_msgs::Image>( mNh, mDepthTopic, 1));
+
+    // ExactTime takes a queue size as its constructor argument, hence MySyncPolicy(10)
+    sync.reset(	new message_filters::Synchronizer<MySyncPolicy>( MySyncPolicy(10), *mColorImgSubscriber_filter, *mDepthImgSubscriber_filter));
+    sync->registerCallback(boost::bind(&CameraReader::callback, this, _1, _2));
+
     // create a subscriber to read the camera parameters from the ROS
     mCamInfoSubscriber = mNh.subscribe<sensor_msgs::CameraInfo>(mCamInfoTopic, 1, &CameraReader::camInfoCallback, this);
-    mColorImgSubscriber = mNh.subscribe<sensor_msgs::Image>(mColorTopic, 1, &CameraReader::colorImgCallback, this);
-    mDepthImgSubscriber = mNh.subscribe<sensor_msgs::Image>(mDepthTopic, 1, &CameraReader::depthImgCallback, this);
+  }
+
+  void CameraReader::callback(const sensor_msgs::ImageConstPtr& colorMsg, const sensor_msgs::ImageConstPtr& depthMsg)
+  {
+    try
+    {
+      auto colorPtr = cv_bridge::toCvCopy(colorMsg, sensor_msgs::image_encodings::BGR8);
+
+      auto depthPtr = cv_bridge::toCvCopy(depthMsg, sensor_msgs::image_encodings::TYPE_16UC1);
+
+      // it is very important to lock the below assignment operation.
+      // remember that we are accessing it from another thread too.
+      std::lock_guard<std::mutex> lock(mMutex);
+      mColorImage = colorPtr->image;
+      mDepthImage = depthPtr->image;
+
+      mFrameNumber++;
+    }
+    catch (cv_bridge::Exception& e)
+    {
+      // display the error at most once per 10 seconds
+      ROS_ERROR_THROTTLE(10, "cv_bridge exception %s at line number %d on function %s in file %s", e.what(), __LINE__,
+                         __FUNCTION__, __FILE__);
+    }
   }
 
   void CameraReader::colorImgCallback(const sensor_msgs::ImageConstPtr& colorMsg)

@@ -21,6 +21,8 @@
 
 #include <std_msgs/Float64MultiArray.h>
 
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>  // Video write
 
 // define a macro for compatibility with older versions
 #define OPENPOSE1POINT6_OR_HIGHER OpenPose_VERSION_MAJOR >= 1 && OpenPose_VERSION_MINOR >= 6
@@ -32,311 +34,262 @@ const int SLEEP_MS = 10;
 typedef std::shared_ptr<op::Datum> sPtrDatum;
 typedef std::shared_ptr<std::vector<sPtrDatum>> sPtrVecSPtrDatum;
 
-// the input worker. the job of this worker is to provide color imagees to
-// openpose wrapper
-class WUserInput : public op::WorkerProducer<sPtrVecSPtrDatum>
+
+sPtrVecSPtrDatum createDatum(const std::shared_ptr<ros_openpose::CameraReader>& sPtrCameraReader)
 {
-public:
-  WUserInput(const std::shared_ptr<ros_openpose::CameraReader>& sPtrCameraReader) : mSPtrCameraReader(sPtrCameraReader)
+  // get the latest color image from the camera
+  auto& colorImage = sPtrCameraReader->getColorFrame();
+
+  if (!colorImage.empty())
   {
+    // create new datum
+    auto datumToProcess = std::make_shared<std::vector<sPtrDatum>>();
+    datumToProcess->emplace_back();
+    auto& datumPtr = datumToProcess->at(0);
+    datumPtr = std::make_shared<op::Datum>();
+
+    // fill the datum
+    #if OPENPOSE1POINT6_OR_HIGHER
+              datumPtr->cvInputData = OP_CV2OPCONSTMAT(colorImage);
+    #else
+              datumPtr->cvInputData = colorImage;
+    #endif
+    return datumToProcess;
   }
-
-  void initializationOnThread()
+  else
   {
-  }
-
-  sPtrVecSPtrDatum workProducer()
-  {
-    try
-    {
-      auto frameNumber = mSPtrCameraReader->getFrameNumber();
-      if (frameNumber == 0 || frameNumber == mFrameNumber)
-      {
-        // display the error at most once per 10 seconds
-        ROS_WARN_THROTTLE(10, "Waiting for color image frame...");
-        std::this_thread::sleep_for(std::chrono::milliseconds{SLEEP_MS});
-        return nullptr;
-      }
-      else
-      {
-        // update frame number
-        mFrameNumber = frameNumber;
-
-        // get the latest color image from the camera
-        auto& colorImage = mSPtrCameraReader->getColorFrame();
-
-        if (!colorImage.empty())
-        {
-          // create new datum
-          auto datumsPtr = std::make_shared<std::vector<sPtrDatum>>();
-          datumsPtr->emplace_back();
-          auto& datumPtr = datumsPtr->at(0);
-          datumPtr = std::make_shared<op::Datum>();
-
-          // fill the datum
-          #if OPENPOSE1POINT6_OR_HIGHER
-                    datumPtr->cvInputData = OP_CV2OPCONSTMAT(colorImage);
-          #else
-                    datumPtr->cvInputData = colorImage;
-          #endif
-
-          return datumsPtr;
-        }
-        else
-        {
-          // display the error at most once per 10 seconds
-          ROS_WARN_THROTTLE(10, "Empty color image frame detected. Ignoring...");
-          return nullptr;
-        }
-      }
-    }
-    catch (const std::exception& e)
-    {
-      this->stop();
       // display the error at most once per 10 seconds
-      ROS_ERROR_THROTTLE(10, "Error %s at line number %d on function %s in file %s", e.what(), __LINE__, __FUNCTION__,
-                         __FILE__);
+      ROS_WARN_THROTTLE(10, "Empty color image frame detected. Ignoring...");
       return nullptr;
+  }
+}
+
+void pubHuman(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_openpose::CameraReader>& sPtrCameraReader,
+                  const ros::Publisher& mFramePublisher, const bool noDepth)
+{
+  ros_openpose::Frame mFrame;
+  try
+  {
+    if (datumsPtr != nullptr && !datumsPtr->empty())
+    {
+      // update timestamp
+      mFrame.header.stamp = ros::Time::now();
+
+      // make sure to clear previous data
+      mFrame.persons.clear();
+
+      // we use the latest depth image for computing point in 3D space
+      sPtrCameraReader->lockLatestDepthImage();
+
+      // accesing each element of the keypoints
+      const auto& poseKeypoints = datumsPtr->at(0)->poseKeypoints;
+      const auto& handKeypoints = datumsPtr->at(0)->handKeypoints;
+
+      // get the size
+      const auto personCount = poseKeypoints.getSize(0);
+      const auto bodyPartCount = poseKeypoints.getSize(1);
+      const auto handPartCount = handKeypoints[0].getSize(1);
+
+      mFrame.persons.resize(personCount);
+
+      // update with the new data
+      for (auto person = 0; person < personCount; person++)
+      {
+        mFrame.persons[person].bodyParts.resize(bodyPartCount);
+        mFrame.persons[person].leftHandParts.resize(handPartCount);
+        mFrame.persons[person].rightHandParts.resize(handPartCount);
+
+        //   fillBodyROSMsg
+        #pragma omp parallel for
+          for (auto bodyPart = 0; bodyPart < bodyPartCount; bodyPart++)
+          {
+            // src:
+            // https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/output.md#keypoint-format-in-the-c-api
+            const auto baseIndex = poseKeypoints.getSize(2) * (person * bodyPartCount + bodyPart);
+            const auto x = poseKeypoints[baseIndex];
+            const auto y = poseKeypoints[baseIndex + 1];
+            const auto score = poseKeypoints[baseIndex + 2];
+
+            float point3D[3];
+            // compute 3D point only if depth flag is set
+            if (!noDepth)
+              sPtrCameraReader->compute3DPoint(x, y, point3D);
+
+            mFrame.persons[person].bodyParts[bodyPart].pixel.x = x;
+            mFrame.persons[person].bodyParts[bodyPart].pixel.y = y;
+            mFrame.persons[person].bodyParts[bodyPart].score = score;
+            mFrame.persons[person].bodyParts[bodyPart].point.x = point3D[0];
+            mFrame.persons[person].bodyParts[bodyPart].point.y = point3D[1];
+            mFrame.persons[person].bodyParts[bodyPart].point.z = point3D[2];
+          }
+          //    fillHandROSMsg
+       if(FLAGS_hand)
+        {
+          #pragma omp parallel for
+              for (auto handPart = 0; handPart < handPartCount; handPart++)
+              {
+                const auto baseIndex = handKeypoints[0].getSize(2) * (person * handPartCount + handPart);
+
+                // left hand
+                const auto xLeft = handKeypoints[0][baseIndex];
+                const auto yLeft = handKeypoints[0][baseIndex + 1];
+                const auto scoreLeft = handKeypoints[0][baseIndex + 2];
+
+                // right hand
+                const auto xRight = handKeypoints[1][baseIndex];
+                const auto yRight = handKeypoints[1][baseIndex + 1];
+                const auto scoreRight = handKeypoints[1][baseIndex + 2];
+
+                float point3DLeft[3];
+                float point3DRight[3];
+
+                // compute 3D point only if depth flag is set
+                sPtrCameraReader->compute3DPoint(xLeft, yLeft, point3DLeft);
+                sPtrCameraReader->compute3DPoint(xRight, yRight, point3DRight);
+
+                mFrame.persons[person].leftHandParts[handPart].pixel.x = xLeft;
+                mFrame.persons[person].leftHandParts[handPart].pixel.y = yLeft;
+                mFrame.persons[person].leftHandParts[handPart].score = scoreLeft;
+                mFrame.persons[person].leftHandParts[handPart].point.x = point3DLeft[0];
+                mFrame.persons[person].leftHandParts[handPart].point.y = point3DLeft[1];
+                mFrame.persons[person].leftHandParts[handPart].point.z = point3DLeft[2];
+
+                mFrame.persons[person].rightHandParts[handPart].pixel.x = xRight;
+                mFrame.persons[person].rightHandParts[handPart].pixel.y = yRight;
+                mFrame.persons[person].rightHandParts[handPart].score = scoreRight;
+                mFrame.persons[person].rightHandParts[handPart].point.x = point3DRight[0];
+                mFrame.persons[person].rightHandParts[handPart].point.y = point3DRight[1];
+                mFrame.persons[person].rightHandParts[handPart].point.z = point3DRight[2];
+              }
+        }
+        }
+      mFramePublisher.publish(mFrame);
+    }
+    else
+    {
+      // display the error at most once per 10 seconds
+      ROS_WARN_THROTTLE(10, "Waiting for datum...");
+      std::this_thread::sleep_for(std::chrono::milliseconds{SLEEP_MS});
     }
   }
+  catch (const std::exception& e)
+  {
+    ROS_ERROR("Error %s at line number %d on function %s in file %s", e.what(), __LINE__, __FUNCTION__, __FILE__);
+  }
+}
 
-private:
-  ullong mFrameNumber = 0ULL;
-  const std::shared_ptr<ros_openpose::CameraReader> mSPtrCameraReader;
-};
-
-// the outpout worker. the job of the output worker is to receive the keypoints
-// detected in 2D space. it then converts 2D pixels to 3D coordinates (wrt
-// camera coordinate system).
-class WUserOutput : public op::WorkerConsumer<sPtrVecSPtrDatum>
+void pubRightWrist(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_openpose::CameraReader>& sPtrCameraReader, const ros::Publisher& mHandPublisher)
 {
-public:
-  // clang-format off
-  WUserOutput(const ros::Publisher& framePublisher,const ros::Publisher& handPublisher,
-              const std::shared_ptr<ros_openpose::CameraReader>& sPtrCameraReader,
-              const std::string& frameId, const bool noDepth, const bool printKeypoints)
-    : mFramePublisher(framePublisher), mHandPublisher(handPublisher), mSPtrCameraReader(sPtrCameraReader), mNoDepth(noDepth), mprintKeypoints(printKeypoints)
+  try
   {
-    mFrame.header.frame_id = frameId;
-  }
-  // clang-format on
-
-  void initializationOnThread()
-  {
-  }
-
-  template <typename Array>
-  void fillBodyROSMsg(Array& poseKeypoints, int person, int bodyPartCount)
-  {
-#pragma omp parallel for
-    for (auto bodyPart = 0; bodyPart < bodyPartCount; bodyPart++)
+    if (datumsPtr != nullptr && !datumsPtr->empty())
     {
+      // we use the latest depth image for computing point in 3D space
+      sPtrCameraReader->lockLatestDepthImage();
+
+      // accesing each element of the keypoints
+      const auto& poseKeypoints = datumsPtr->at(0)->poseKeypoints;
+
+      // get the size
+      const auto bodyPartCount = poseKeypoints.getSize(1);
+
+      // only dectect the right wrist of the first person
+      auto person = 0;
+      auto bodyPart = 4;
+
       // src:
       // https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/output.md#keypoint-format-in-the-c-api
       const auto baseIndex = poseKeypoints.getSize(2) * (person * bodyPartCount + bodyPart);
       const auto x = poseKeypoints[baseIndex];
       const auto y = poseKeypoints[baseIndex + 1];
-      const auto score = poseKeypoints[baseIndex + 2];
 
       float point3D[3];
-      // compute 3D point only if depth flag is set
-      if (!mNoDepth)
-        mSPtrCameraReader->compute3DPoint(x, y, point3D);
+      sPtrCameraReader->compute3DPoint(x, y, point3D);
 
-      mFrame.persons[person].bodyParts[bodyPart].pixel.x = x;
-      mFrame.persons[person].bodyParts[bodyPart].pixel.y = y;
-      mFrame.persons[person].bodyParts[bodyPart].score = score;
-      mFrame.persons[person].bodyParts[bodyPart].point.x = point3D[0];
-      mFrame.persons[person].bodyParts[bodyPart].point.y = point3D[1];
-      mFrame.persons[person].bodyParts[bodyPart].point.z = point3D[2];
-
-      if (bodyPart == 4)
-      {
-        // std::cout<< "right wrist, x: " << point3D[0] << "y: "<<  point3D[1] << "z: "<< point3D[2] <<std::endl;
-        // std::cout<< "right wrist, pixel x: " << x << "y: "<<  y <<std::endl;
-        std_msgs::Float64MultiArray handmsg;
-        for (auto it = 0; it<3; it++)
-           handmsg.data.push_back(point3D[it]);
-        mHandPublisher.publish(handmsg);
-      }
+      // std::cout<< "right wrist, x: " << point3D[0] << "y: "<<  point3D[1] << "z: "<< point3D[2] <<std::endl;
+      // std::cout<< "right wrist, pixel x: " << x << "y: "<<  y <<std::endl;
+      std_msgs::Float64MultiArray handmsg;
+      for (auto it = 0; it<3; it++)
+          handmsg.data.push_back(point3D[it]);
+      mHandPublisher.publish(handmsg);
+    }
+    else
+    {
+      // display the error at most once per 10 seconds
+      ROS_WARN_THROTTLE(10, "Waiting for datum...");
+      std::this_thread::sleep_for(std::chrono::milliseconds{SLEEP_MS});
     }
   }
-
-  template <typename ArrayOfArray>
-  void fillHandROSMsg(ArrayOfArray& handKeypoints, int person, int handPartCount)
+  catch (const std::exception& e)
   {
-#pragma omp parallel for
-    for (auto handPart = 0; handPart < handPartCount; handPart++)
-    {
-      const auto baseIndex = handKeypoints[0].getSize(2) * (person * handPartCount + handPart);
-
-      // left hand
-      const auto xLeft = handKeypoints[0][baseIndex];
-      const auto yLeft = handKeypoints[0][baseIndex + 1];
-      const auto scoreLeft = handKeypoints[0][baseIndex + 2];
-
-      // right hand
-      const auto xRight = handKeypoints[1][baseIndex];
-      const auto yRight = handKeypoints[1][baseIndex + 1];
-      const auto scoreRight = handKeypoints[1][baseIndex + 2];
-
-      float point3DLeft[3];
-      float point3DRight[3];
-
-      // compute 3D point only if depth flag is set
-      if (!mNoDepth)
-      {
-        mSPtrCameraReader->compute3DPoint(xLeft, yLeft, point3DLeft);
-        mSPtrCameraReader->compute3DPoint(xRight, yRight, point3DRight);
-      }
-
-      mFrame.persons[person].leftHandParts[handPart].pixel.x = xLeft;
-      mFrame.persons[person].leftHandParts[handPart].pixel.y = yLeft;
-      mFrame.persons[person].leftHandParts[handPart].score = scoreLeft;
-      mFrame.persons[person].leftHandParts[handPart].point.x = point3DLeft[0];
-      mFrame.persons[person].leftHandParts[handPart].point.y = point3DLeft[1];
-      mFrame.persons[person].leftHandParts[handPart].point.z = point3DLeft[2];
-
-      mFrame.persons[person].rightHandParts[handPart].pixel.x = xRight;
-      mFrame.persons[person].rightHandParts[handPart].pixel.y = yRight;
-      mFrame.persons[person].rightHandParts[handPart].score = scoreRight;
-      mFrame.persons[person].rightHandParts[handPart].point.x = point3DRight[0];
-      mFrame.persons[person].rightHandParts[handPart].point.y = point3DRight[1];
-      mFrame.persons[person].rightHandParts[handPart].point.z = point3DRight[2];
-    }
+    ROS_ERROR("Error %s at line number %d on function %s in file %s", e.what(), __LINE__, __FUNCTION__, __FILE__);
   }
+}
 
-  void workConsumer(const sPtrVecSPtrDatum& datumsPtr)
-  {
-    try
+void printHumanKeypoints(const sPtrVecSPtrDatum& datumsPtr)
+{
+    // Example: How to use the pose keypoints
+    if (datumsPtr != nullptr && !datumsPtr->empty())
     {
-      if (datumsPtr != nullptr && !datumsPtr->empty())
-      {
-        // update timestamp
-        mFrame.header.stamp = ros::Time::now();
-
-        // make sure to clear previous data
-        mFrame.persons.clear();
-
-        // we use the latest depth image for computing point in 3D space
-        mSPtrCameraReader->lockLatestDepthImage();
-
-        // accesing each element of the keypoints
+        op::opLog("\nKeypoints:");
+        // Accesing each element of the keypoints
         const auto& poseKeypoints = datumsPtr->at(0)->poseKeypoints;
-        const auto& handKeypoints = datumsPtr->at(0)->handKeypoints;
-
-        // get the size
-        const auto personCount = poseKeypoints.getSize(0);
-        const auto bodyPartCount = poseKeypoints.getSize(1);
-        const auto handPartCount = handKeypoints[0].getSize(1);
-
-        mFrame.persons.resize(personCount);
-
-        // update with the new data
-        for (auto person = 0; person < personCount; person++)
+        op::opLog("Person pose keypoints:");
+        for (auto person = 0 ; person < poseKeypoints.getSize(0) ; person++)
         {
-          mFrame.persons[person].bodyParts.resize(bodyPartCount);
-          mFrame.persons[person].leftHandParts.resize(handPartCount);
-          mFrame.persons[person].rightHandParts.resize(handPartCount);
-
-          fillBodyROSMsg(poseKeypoints, person, bodyPartCount);
-          fillHandROSMsg(handKeypoints, person, handPartCount);
+            op::opLog("Person " + std::to_string(person) + " (x, y, score):");
+            for (auto bodyPart = 0 ; bodyPart < poseKeypoints.getSize(1) ; bodyPart++)
+            {
+                std::string valueToPrint;
+                for (auto xyscore = 0 ; xyscore < poseKeypoints.getSize(2) ; xyscore++)
+                {
+                    valueToPrint += std::to_string(   poseKeypoints[{person, bodyPart, xyscore}]   ) + " ";
+                }
+                op::opLog(valueToPrint);
+            }
         }
-
-        mFramePublisher.publish(mFrame);
-        if (mprintKeypoints)
-          printKeypoints(datumsPtr);
-      }
-      else
-      {
-        // display the error at most once per 10 seconds
-        ROS_WARN_THROTTLE(10, "Waiting for datum...");
-        std::this_thread::sleep_for(std::chrono::milliseconds{SLEEP_MS});
-      }
+        op::opLog(" ");
+        // Alternative: just getting std::string equivalent
+        if(FLAGS_face)
+        {
+            op::opLog("Face keypoints: " + datumsPtr->at(0)->faceKeypoints.toString(), op::Priority::High);
+        }
+        if(FLAGS_hand)
+        {
+            op::opLog("Left hand keypoints: " + datumsPtr->at(0)->handKeypoints[0].toString(), op::Priority::High);
+            op::opLog("Right hand keypoints: " + datumsPtr->at(0)->handKeypoints[1].toString(), op::Priority::High);
+        }
+        // Heatmaps
+        const auto& poseHeatMaps = datumsPtr->at(0)->poseHeatMaps;
+        if (!poseHeatMaps.empty())
+        {
+            op::opLog("Pose heatmaps size: [" + std::to_string(poseHeatMaps.getSize(0)) + ", "
+                    + std::to_string(poseHeatMaps.getSize(1)) + ", "
+                    + std::to_string(poseHeatMaps.getSize(2)) + "]");
+            const auto& faceHeatMaps = datumsPtr->at(0)->faceHeatMaps;
+            op::opLog("Face heatmaps size: [" + std::to_string(faceHeatMaps.getSize(0)) + ", "
+                    + std::to_string(faceHeatMaps.getSize(1)) + ", "
+                    + std::to_string(faceHeatMaps.getSize(2)) + ", "
+                    + std::to_string(faceHeatMaps.getSize(3)) + "]");
+            const auto& handHeatMaps = datumsPtr->at(0)->handHeatMaps;
+            op::opLog("Left hand heatmaps size: [" + std::to_string(handHeatMaps[0].getSize(0)) + ", "
+                    + std::to_string(handHeatMaps[0].getSize(1)) + ", "
+                    + std::to_string(handHeatMaps[0].getSize(2)) + ", "
+                    + std::to_string(handHeatMaps[0].getSize(3)) + "]");
+            op::opLog("Right hand heatmaps size: [" + std::to_string(handHeatMaps[1].getSize(0)) + ", "
+                    + std::to_string(handHeatMaps[1].getSize(1)) + ", "
+                    + std::to_string(handHeatMaps[1].getSize(2)) + ", "
+                    + std::to_string(handHeatMaps[1].getSize(3)) + "]");
+        }
     }
-    catch (const std::exception& e)
-    {
-      this->stop();
-      ROS_ERROR("Error %s at line number %d on function %s in file %s", e.what(), __LINE__, __FUNCTION__, __FILE__);
-    }
-  }
-
-  void printKeypoints(const std::shared_ptr<std::vector<std::shared_ptr<op::Datum>>>& datumsPtr)
-  {
-      // Example: How to use the pose keypoints
-      if (datumsPtr != nullptr && !datumsPtr->empty())
-      {
-          op::opLog("\nKeypoints:");
-          // Accesing each element of the keypoints
-          const auto& poseKeypoints = datumsPtr->at(0)->poseKeypoints;
-          op::opLog("Person pose keypoints:");
-          for (auto person = 0 ; person < poseKeypoints.getSize(0) ; person++)
-          {
-              op::opLog("Person " + std::to_string(person) + " (x, y, score):");
-              for (auto bodyPart = 0 ; bodyPart < poseKeypoints.getSize(1) ; bodyPart++)
-              {
-                  std::string valueToPrint;
-                  for (auto xyscore = 0 ; xyscore < poseKeypoints.getSize(2) ; xyscore++)
-                  {
-                      valueToPrint += std::to_string(   poseKeypoints[{person, bodyPart, xyscore}]   ) + " ";
-                  }
-                  op::opLog(valueToPrint);
-              }
-          }
-          op::opLog(" ");
-          // Alternative: just getting std::string equivalent
-          if(FLAGS_face)
-          {
-              op::opLog("Face keypoints: " + datumsPtr->at(0)->faceKeypoints.toString(), op::Priority::High);
-          }
-          if(FLAGS_hand)
-          {
-              op::opLog("Left hand keypoints: " + datumsPtr->at(0)->handKeypoints[0].toString(), op::Priority::High);
-              op::opLog("Right hand keypoints: " + datumsPtr->at(0)->handKeypoints[1].toString(), op::Priority::High);
-          }
-          // Heatmaps
-          const auto& poseHeatMaps = datumsPtr->at(0)->poseHeatMaps;
-          if (!poseHeatMaps.empty())
-          {
-              op::opLog("Pose heatmaps size: [" + std::to_string(poseHeatMaps.getSize(0)) + ", "
-                      + std::to_string(poseHeatMaps.getSize(1)) + ", "
-                      + std::to_string(poseHeatMaps.getSize(2)) + "]");
-              const auto& faceHeatMaps = datumsPtr->at(0)->faceHeatMaps;
-              op::opLog("Face heatmaps size: [" + std::to_string(faceHeatMaps.getSize(0)) + ", "
-                      + std::to_string(faceHeatMaps.getSize(1)) + ", "
-                      + std::to_string(faceHeatMaps.getSize(2)) + ", "
-                      + std::to_string(faceHeatMaps.getSize(3)) + "]");
-              const auto& handHeatMaps = datumsPtr->at(0)->handHeatMaps;
-              op::opLog("Left hand heatmaps size: [" + std::to_string(handHeatMaps[0].getSize(0)) + ", "
-                      + std::to_string(handHeatMaps[0].getSize(1)) + ", "
-                      + std::to_string(handHeatMaps[0].getSize(2)) + ", "
-                      + std::to_string(handHeatMaps[0].getSize(3)) + "]");
-              op::opLog("Right hand heatmaps size: [" + std::to_string(handHeatMaps[1].getSize(0)) + ", "
-                      + std::to_string(handHeatMaps[1].getSize(1)) + ", "
-                      + std::to_string(handHeatMaps[1].getSize(2)) + ", "
-                      + std::to_string(handHeatMaps[1].getSize(3)) + "]");
-          }
-      }
-      else
-          op::opLog("Nullptr or empty datumsPtr found.", op::Priority::High);
-  }
-
-private:
-  const bool mNoDepth;
-  const bool mprintKeypoints;
-  ros_openpose::Frame mFrame;
-  const ros::Publisher mFramePublisher, mHandPublisher;
-  const std::shared_ptr<ros_openpose::CameraReader> mSPtrCameraReader;
-};
+    else
+        op::opLog("Nullptr or empty datumsPtr found.", op::Priority::High);
+}
 
 // clang-format off
-void configureOpenPose(op::Wrapper& opWrapper,
-                       const std::shared_ptr<ros_openpose::CameraReader>& cameraReader,
-                       const ros::Publisher& framePublisher,
-                       const ros::Publisher& handPublisher,
-                       const std::string& frameId, const bool noDepth, const bool printKeypoints)
+void configureOpenPose(op::Wrapper& opWrapper)
 // clang-format on
-{
+ {
   try
   {
 // Configuring OpenPose
@@ -421,15 +374,15 @@ void configureOpenPose(op::Wrapper& opWrapper,
     const bool enableGoogleLogging = true;
 
     // Initializing the user custom classes
-    auto wUserInput = std::make_shared<WUserInput>(cameraReader);
-    auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, handPublisher, cameraReader, frameId, noDepth, printKeypoints);
-
-    // Add custom processing
-    const auto workerInputOnNewThread = true;
-    opWrapper.setWorker(op::WorkerType::Input, wUserInput, workerInputOnNewThread);
-
-    const auto workerOutputOnNewThread = true;
-    opWrapper.setWorker(op::WorkerType::Output, wUserOutput, workerOutputOnNewThread);
+    // auto wUserInput = std::make_shared<WUserInput>(cameraReader);
+    // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, handPublisher, cameraReader, frameId, noDepth, printKeypoints);
+    //
+    // // Add custom processing
+    // const auto workerInputOnNewThread = true;
+    // opWrapper.setWorker(op::WorkerType::Input, wUserInput, workerInputOnNewThread);
+    //
+    // const auto workerOutputOnNewThread = true;
+    // opWrapper.setWorker(op::WorkerType::Output, wUserOutput, workerOutputOnNewThread);
 
     // Pose configuration (use WrapperStructPose{} for default and recommended configuration)
     const op::WrapperStructPose wrapperStructPose{poseMode,
@@ -572,10 +525,13 @@ void configureOpenPose(op::Wrapper& opWrapper,
 int main(int argc, char* argv[])
 {
   ros::init(argc, argv, "ros_openpose_node");
+  //  have to use multiple threads, otherwise the cameraReader thread cannot work
+  ros::AsyncSpinner spinner(1);
+  spinner.start();
   ros::NodeHandle nh("~");
 
   // define the parameters, we are going to read
-  bool noDepth, printKeypoints;
+  bool noDepth, printKeypoints, pubRightWristMsg, pubHumanMsg;
   std::string colorTopic, depthTopic, camInfoTopic, frameId, pubTopic;
 
   // read the parameters from relative nodel handle
@@ -586,6 +542,8 @@ int main(int argc, char* argv[])
   nh.getParam("depth_topic", depthTopic);
   nh.getParam("cam_info_topic", camInfoTopic);
   nh.param("print_keypoints", printKeypoints, false);
+  nh.param("pub_RightWristMsg", pubRightWristMsg, false);
+  nh.param("pub_HumanMsg", pubHumanMsg, false);
 
   if (pubTopic.empty())
   {
@@ -602,28 +560,64 @@ int main(int argc, char* argv[])
   const ros::Publisher framePublisher = nh.advertise<ros_openpose::Frame>(pubTopic, 1);
   const ros::Publisher handPublisher = nh.advertise<std_msgs::Float64MultiArray>("right_hand_point", 1);
 
-  try
+  // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, handPublisher, cameraReader, frameId, noDepth);
+
+  ROS_INFO("Starting ros_openpose...");
+  op::Wrapper opWrapper{op::ThreadManagerMode::Asynchronous};
+  configureOpenPose(opWrapper);
+
+  // ros::Duration(1).sleep();
+  // start and run
+  opWrapper.start();
+
+  while(ros::ok())
   {
-    ROS_INFO("Starting ros_openpose...");
-    op::Wrapper opWrapper;
-    configureOpenPose(opWrapper, cameraReader, framePublisher, handPublisher, frameId, noDepth, printKeypoints);
+    try
+    {
+      auto frameNumber = cameraReader->getFrameNumber();
+      if (frameNumber == 0 || frameNumber == 0ULL)
+      {
+        // display the error at most once per 10 seconds
+        ROS_WARN_THROTTLE(10, "Waiting for color image frame...");
+        std::this_thread::sleep_for(std::chrono::milliseconds{SLEEP_MS});
+      }
+      else
+      {
+        sPtrVecSPtrDatum datumToProcess = createDatum(cameraReader);
+        bool successfullyEmplaced = opWrapper.waitAndEmplace(datumToProcess);
 
-    // start and run
-    opWrapper.start();
-
-    // exit when Ctrl-C is pressed, or the node is shutdown by the master
-    ros::spin();
-
-    // return successful message
-    ROS_INFO("Exiting ros_openpose...");
-
-    // stop processing
-    opWrapper.stop();
-    return 0;
+        sPtrVecSPtrDatum datumProcessed;
+        if (successfullyEmplaced && opWrapper.waitAndPop(datumProcessed))
+        {
+              if(pubHumanMsg)
+                pubHuman(datumProcessed, cameraReader, framePublisher, noDepth);
+              if (pubRightWristMsg && (!noDepth))
+                pubRightWrist(datumProcessed, cameraReader, handPublisher);
+              if (printKeypoints)
+                printHumanKeypoints(datumProcessed);
+        }
+        else
+        {
+            op::opLog("Processed datum could not be emplaced.", op::Priority::High,
+                    __LINE__, __FUNCTION__, __FILE__);
+        }
+      }
+    }
+    catch (const std::exception& e)
+    {
+      // display the error at most once per 10 seconds
+      ROS_ERROR_THROTTLE(10, "Error %s at line number %d on function %s in file %s", e.what(), __LINE__, __FUNCTION__,
+                           __FILE__);
+    }
   }
-  catch (const std::exception& e)
-  {
-    ROS_ERROR("Error %s at line number %d on function %s in file %s", e.what(), __LINE__, __FUNCTION__, __FILE__);
-    return -1;
-  }
+
+  // exit when Ctrl-C is pressed, or the node is shutdown by the master
+  ros::waitForShutdown();
+
+  // return successful message
+  ROS_INFO("Exiting ros_openpose...");
+
+  // stop processing
+  opWrapper.stop();
+  return 0;
 }

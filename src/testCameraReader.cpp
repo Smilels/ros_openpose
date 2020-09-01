@@ -47,13 +47,13 @@ int main(int argc, char* argv[])
   ros::init(argc, argv, "test_camera_reader");
   ros::NodeHandle nh;
 
-  // const std::string colorTopic = "/camera/color/image_raw";
-  // const std::string camInfoTopic = "/camera/color/camera_info";
-  // const std::string depthTopic = "/camera/aligned_depth_to_color/image_raw";
+  const std::string colorTopic = "/camera/color/image_raw";
+  const std::string camInfoTopic = "/camera/color/camera_info";
+  const std::string depthTopic = "/camera/aligned_depth_to_color/image_raw";
 
-  const std::string colorTopic = "/kinect2/qhd/image_color_rect";
-  const std::string camInfoTopic = "/kinect2/qhd/camera_info";
-  const std::string depthTopic = "/kinect2/qhd/image_depth_rect";
+  // const std::string colorTopic = "/kinect2/qhd/image_color_rect";
+  // const std::string camInfoTopic = "/kinect2/qhd/camera_info";
+  // const std::string depthTopic = "/kinect2/qhd/image_depth_rect/comp";
   const auto cameraReader = std::make_shared<ros_openpose::CameraReader>(nh, colorTopic, depthTopic, camInfoTopic);
 
   show(cameraReader);

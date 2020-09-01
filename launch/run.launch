@@ -6,7 +6,7 @@ Date: 2019/11/23
 -->
 <launch>
   <!-- the value of this argument can only be one of the following: realsense, kinect, zed2, nodepth -->
-  <arg name="camera" default="kinect" />
+  <arg name="camera" default="realsense" />
 
   <!-- set this flag to see invoke RViz -->
   <arg name="rviz" default="false" />
@@ -26,7 +26,7 @@ Date: 2019/11/23
   -->
 
   <!-- full path to the model dir of openpose -->
-  <arg name="openpose_args" value=" --model_folder /homeL/shuang/code/openpose/models/ --number_people_max 1"/>
+  <arg name="openpose_args" value=" --model_folder /homeL/shuang/code/openpose/models/ --number_people_max 1 --display 0"/>
 
   <!-- rostopic to publish the 3D skeleton data -->
   <arg name="pub_topic" default="/frame" />
@@ -43,9 +43,17 @@ Date: 2019/11/23
   <!-- flag to enable printing ros message to terminal -->
   <arg name="print_keypoints" default="false" />
 
+    <!-- flag to enable publishing the right wrist data -->
+    <arg name="pub_RightWristMsg" default="true" />
+
+    <!-- flag to enable publishing the whole human skeleton data -->
+    <arg name="pub_HumanMsg" default="false" />
+
   <include file="$(find ros_openpose)/launch/config_$(arg camera).launch" >
     <arg name="rviz" value="$(arg rviz)" />
     <arg name="print_keypoints" value="$(arg print_keypoints)" />
+    <arg name="pub_RightWristMsg" value="$(arg pub_RightWristMsg)" />
+    <arg name="pub_HumanMsg" value="$(arg pub_HumanMsg)" />
     <arg name="skeleton" value="$(arg skeleton)" />
     <arg name="pub_topic" value="$(arg pub_topic)" />
     <arg name="pointcloud" value="$(arg pointcloud)" />
