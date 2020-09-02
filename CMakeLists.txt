@@ -99,6 +99,22 @@ target_link_libraries(rosOpenpose
   ${catkin_LIBRARIES}
 )
 
+add_executable(original_rosOpenpose
+  src/original_rosOpenpose.cpp
+  src/cameraReader.cpp)
+
+# Bug fix
+# src: https://github.com/ravijo/ros_openpose/issues/14#issuecomment-631164300
+add_dependencies(original_rosOpenpose ros_openpose_generate_messages_cpp)
+
+target_link_libraries(original_rosOpenpose
+  ${OpenPose_LIBS}
+  ${GFLAGS_LIBRARY}
+  ${GLOG_LIBRARY}
+  ${OpenCV_LIBS}
+  ${catkin_LIBRARIES}
+)
+
 add_executable(testCameraReader
   src/testCameraReader.cpp
   src/cameraReader.cpp)

@@ -25,6 +25,7 @@ Date: 2020/03/02
 
   <!-- invoke rosOpenpose node -->
   <node name="rosOpenpose" pkg="ros_openpose" type="rosOpenpose" output="screen" required="true" args="$(arg openpose_args)">
+  <!-- <node name="original_rosOpenpose" pkg="ros_openpose" type="original_rosOpenpose" output="screen" required="true" args="$(arg openpose_args)"> -->
     <param name="pub_RightWristMsg" value="$(arg pub_RightWristMsg)" />
     <param name="pub_HumanMsg" value="$(arg pub_HumanMsg)" />
     <param name="print_keypoints" value="$(arg print_keypoints)" />

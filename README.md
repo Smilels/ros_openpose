@@ -76,8 +76,8 @@ chmod +x *.py
     git checkout tags/v1.5.1
     ```
     Do not forget to run `sudo make install` to install the OpenPose system-wide.</s> *Note that OpenPose version 1.5.1 is still supported.*
-    
-    
+
+
 ## Configuration
 The main launch file is `run.launch`. It has the following important arguments-
 1. `model_folder`: It represents the full path to the model directory of OpenPose. Kindly modify it as per OpenPose installation in your machine. Please edit `run.launch` file as shown below-
@@ -158,8 +158,8 @@ Here `YOUR_ROSTOPIC` must have the same value as `color_topic`.
 1. **How to add my own depth camera into this wrapper?**
 
     Go inside `launch` subdirectory and make a copy of `config_realsense.launch` as `config_mycamera.launch`. Make necessary changes to the `color_topic`, `depth_topic`, `cam_info_topic` and `frame_id` arguments. More inforation is given below-
-    * Input depth images are aligned to the color images already. 
-    * Depth and color images have the same dimension. Therefore, each pixel from the color image can be mapped to corresponding depth pixel at the same x, y location. 
+    * Input depth images are aligned to the color images already.
+    * Depth and color images have the same dimension. Therefore, each pixel from the color image can be mapped to corresponding depth pixel at the same x, y location.
     * The depth images contain depth values in millimeters and represented by `TYPE_16UC1` using OpenCV.
     * The `cam_info_topic` is containing camera calibration parameters supplied by the manufacturer.
 
@@ -167,13 +167,13 @@ Here `YOUR_ROSTOPIC` must have the same value as `color_topic`.
 
 2. **How to run this wrapper with limited resources such as low GPU, RAM, etc.?**
 
-    Below is a brief explanation about the `ros_openpose` package. This package does not use GPU directly. However, it depends on `OpenPose`, which uses GPU heavily. It contains a few ROS subscribers, which copies data from the camera using ROS. Next, it employs two workers, namely input and output workers. The job of the input worker is to provide color images to the `OpenPose`, whereas the role of the output worker is to receive the keypoints detected in 2D (pixel) space. The output worker then converts 2D pixels to 3D coordinates. The input worker waits for 10 milliseconds if the camera provides no new frames, and then it checks again if no new frame is available. If not, then wait for 10 milliseconds, and the cycle continues. In this way, we make sure that the CPU gets some time to sleep (indirectly lowering the CPU usage). 
+    Below is a brief explanation about the `ros_openpose` package. This package does not use GPU directly. However, it depends on `OpenPose`, which uses GPU heavily. It contains a few ROS subscribers, which copies data from the camera using ROS. Next, it employs two workers, namely input and output workers. The job of the input worker is to provide color images to the `OpenPose`, whereas the role of the output worker is to receive the keypoints detected in 2D (pixel) space. The output worker then converts 2D pixels to 3D coordinates. The input worker waits for 10 milliseconds if the camera provides no new frames, and then it checks again if no new frame is available. If not, then wait for 10 milliseconds, and the cycle continues. In this way, we make sure that the CPU gets some time to sleep (indirectly lowering the CPU usage).
 
-    * If the CPU usage are high, try increasing the sleep value (`SLEEP_MS`) as defined [here](https://github.com/ravijo/ros_openpose/blob/d101e2550ded3bd8d6dd71e27ff43693f28894ab/src/rosOpenpose.cpp#L26). 
-    * Try reducing the `--net_resolution` and by using `--model_pose COCO`. 
+    * If the CPU usage are high, try increasing the sleep value (`SLEEP_MS`) as defined [here](https://github.com/ravijo/ros_openpose/blob/d101e2550ded3bd8d6dd71e27ff43693f28894ab/src/rosOpenpose.cpp#L26).
+    * Try reducing the `--net_resolution` and by using `--model_pose COCO`.
     * Try disabling multithreading in OpenPose software simply by supplying `--disable_multi_thread` to `openpose_args` inside `run.launch` file.
     * Another easiest way is to decrease the FPS of your camera. Please try to lower it down as per your limitations.
-    
+
     Please check [here](https://github.com/ravijo/ros_openpose/issues/6) for a similar question.
 
 3. **How to find the version of the OpenPose installed on my machiine?**
@@ -190,17 +190,17 @@ This package has been tested on the following environment configuration-
 
 | Name      | Value                                  |
 | ----------| -------------------------------------- |
-| OS        | Ubuntu 14.04.6 LTS (64-bit)            |
-| RAM       | 16 GB                                  |
-| Processor | Intel® Core™ i7-7700 CPU @ 3.60GHz × 8 |
-| Kernel    | Version 4.4.0-148-generic              |
-| ROS       | Indigo                                 |
-| GCC       | Version 5.5.0                          |
-| OpenCV    | Version 2.4.8                          |
-| OpenPose  | Version 1.5.1                          |
-| GPU       | GeForce GTX 1080                       |
-| CUDA      | Version 8.0.61                         |
-| cuDNN     | Version 5.1.10                         |
+| OS        | Ubuntu 16.04 LTS (64-bit)              |
+| RAM       | 125.6 GB                               |
+| Processor | Intel® Core i9-7900X CPU@3.30GHz × 20  |
+| Kernel    | Version 4.15.0-107-generic             |
+| ROS       | Kinetic                                |
+| GCC       | Version 5.4.0                          |
+| OpenCV    | Version 3.3.1                          |
+| OpenPose  | Version 1.6.1                          |
+| GPU       | 2 * GeForce GTX 1080                   |
+| CUDA      | Version 9.0.176                        |
+| cuDNN     | Version 7.4.2                          |
 
 
 ## Issues (or Error Reporting)
@@ -211,4 +211,3 @@ Please check [here](https://github.com/ravijo/ros_openpose/issues) and create is
 Following authors are sincerely acknowledged for the improvements of this package-
 * [Marike Koch van den Broek](https://github.com/ruksen25): For adding support for [Stereolabs ZED2 Camera](https://www.stereolabs.com/zed-2/)
 * [Zhi](https://github.com/xiangzhi): For providing compatibility for OpenPose 1.6
-
