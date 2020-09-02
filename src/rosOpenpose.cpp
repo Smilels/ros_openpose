@@ -195,22 +195,27 @@ void pubRightWrist(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_
 
       // only dectect the right wrist of the first person
       auto person = 0;
-      auto bodyPart = 4;
-
-      // src:
-      // https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/output.md#keypoint-format-in-the-c-api
-      const auto baseIndex = poseKeypoints.getSize(2) * (person * bodyPartCount + bodyPart);
-      const auto x = poseKeypoints[baseIndex];
-      const auto y = poseKeypoints[baseIndex + 1];
-
-      float point3D[3];
-      sPtrCameraReader->compute3DPoint(x, y, point3D);
-
-      // std::cout<< "right wrist, x: " << point3D[0] << "y: "<<  point3D[1] << "z: "<< point3D[2] <<std::endl;
-      // std::cout<< "right wrist, pixel x: " << x << "y: "<<  y <<std::endl;
       std_msgs::Float64MultiArray handmsg;
-      for (auto it = 0; it<3; it++)
-          handmsg.data.push_back(point3D[it]);
+
+      auto bodyPart = 4;
+      //record the right and left wrist position
+      std::vector<int> bodyParts{4, 7};
+      for (auto bodyPart: bodyParts)
+      {
+        // src:
+        // https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/output.md#keypoint-format-in-the-c-api
+        const auto baseIndex = poseKeypoints.getSize(2) * (person * bodyPartCount + bodyPart);
+        const auto x = poseKeypoints[baseIndex];
+        const auto y = poseKeypoints[baseIndex + 1];
+
+        float point3D[3];
+        sPtrCameraReader->compute3DPoint(x, y, point3D);
+
+        // std::cout<< "right wrist, x: " << point3D[0] << "y: "<<  point3D[1] << "z: "<< point3D[2] <<std::endl;
+        // std::cout<< "right wrist, pixel x: " << x << "y: "<<  y <<std::endl;
+        for (auto point: point3D)
+            handmsg.data.push_back(point);
+      }
       mHandPublisher.publish(handmsg);
     }
     else
