@@ -6,7 +6,7 @@ Date: 2019/11/23
 -->
 <launch>
   <!-- the value of this argument can only be one of the following: realsense, kinect, zed2, nodepth -->
-  <arg name="camera" default="realsense" />
+  <arg name="camera" default="kinect" />
 
   <!-- set this flag to see invoke RViz -->
   <arg name="rviz" default="false" />
@@ -48,6 +48,11 @@ Date: 2019/11/23
 
     <!-- flag to enable publishing the whole human skeleton data -->
     <arg name="pub_HumanMsg" default="false" />
+
+    <!-- republish the compressed topics -->
+    <!-- using the compressed topics can increase the frequency-->
+   <node name="republish" type="republish" pkg="image_transport" output="screen"
+     args="compressed in:=/kinect2/qhd/image_depth_rect raw out:=/kinect2/remapped/qhd/image_depth_rect" />
 
   <include file="$(find ros_openpose)/launch/config_$(arg camera).launch" >
     <arg name="rviz" value="$(arg rviz)" />

@@ -11,7 +11,7 @@ Date: 2019/11/23
   <!-- <arg name="color_topic" default="/kinect2/qhd/image_color_rect" /> -->
 
   <!-- rostopic to subscribe for depth images -->
-  <arg name="depth_topic" default="/kinect2/sd/image_depth" />
+  <arg name="depth_topic" default="/kinect2/remapped/qhd/image_depth_rect" />
   <!-- <arg name="depth_topic" default="/kinect2/qhd/image_depth_rect" /> -->
 
   <!-- rostopic to subscribe for camera calibration parameters -->
@@ -29,6 +29,8 @@ Date: 2019/11/23
 
   <!-- note that the following parameters are going to assigned by other launch file upon call. -->
   <arg name="rviz" default="" />
+  <arg name="pub_RightWristMsg" default="" />
+  <arg name="pub_HumanMsg" default="" />
   <arg name="print_keypoints" default="" />
   <arg name="skeleton" default="" />
   <arg name="pub_topic" default="" />
@@ -41,6 +43,8 @@ Date: 2019/11/23
 
   <include file="$(find ros_openpose)/launch/core.launch" >
     <arg name="print_keypoints" value="$(arg print_keypoints)" />
+    <arg name="pub_RightWristMsg" default="" />
+    <arg name="pub_HumanMsg" default="" />
     <arg name="no_depth" value="$(arg no_depth)" />
     <arg name="skeleton" value="$(arg skeleton)" />
     <arg name="frame_id" value="$(arg frame_id)" />
