@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
 
   const std::string colorTopic = "/kinect2/qhd/image_color_rect";
   const std::string camInfoTopic = "/kinect2/qhd/camera_info";
-  const std::string depthTopic = "/kinect2/qhd/image_depth_rect/comp";
+  const std::string depthTopic = "/kinect2/remapped/qhd/image_depth_rect";
   const auto cameraReader = std::make_shared<ros_openpose::CameraReader>(nh, colorTopic, depthTopic, camInfoTopic);
 
   show(cameraReader);

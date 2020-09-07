@@ -43,16 +43,19 @@ Date: 2019/11/23
   <!-- flag to enable printing ros message to terminal -->
   <arg name="print_keypoints" default="false" />
 
-    <!-- flag to enable publishing the right wrist data -->
-    <arg name="pub_RightWristMsg" default="true" />
+  <!-- flag to enable publishing the right wrist data -->
+  <arg name="pub_RightWristMsg" default="true" />
 
-    <!-- flag to enable publishing the whole human skeleton data -->
-    <arg name="pub_HumanMsg" default="false" />
+  <!-- flag to enable publishing the whole human skeleton data -->
+  <arg name="pub_HumanMsg" default="true" />
 
-    <!-- republish the compressed topics -->
-    <!-- using the compressed topics can increase the frequency-->
-   <node name="republish" type="republish" pkg="image_transport" output="screen"
-     args="compressed in:=/kinect2/qhd/image_depth_rect raw out:=/kinect2/remapped/qhd/image_depth_rect" />
+  <!-- republish the compressed topics -->
+  <!-- using the compressed topics can increase the frequency-->
+ <node name="republish_depth" type="republish" pkg="image_transport" output="screen"
+   args="compressed in:=/kinect2/sd/image_depth_rect raw out:=/kinect2/remapped/sd/image_depth_rect" />
+
+   <node name="republish_color" type="republish" pkg="image_transport" output="screen"
+     args="compressed in:=/kinect2/sd/image_color_rect raw out:=/kinect2/remapped/sd/image_color_rect" />
 
   <include file="$(find ros_openpose)/launch/config_$(arg camera).launch" >
     <arg name="rviz" value="$(arg rviz)" />

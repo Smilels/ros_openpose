@@ -7,16 +7,16 @@ Date: 2019/11/23
 -->
 <launch>
   <!-- rostopic to subscribe for color images -->
-  <arg name="color_topic" default="/kinect2/sd/image_color_rect" />
-  <!-- <arg name="color_topic" default="/kinect2/qhd/image_color_rect" /> -->
+  <!-- <arg name="color_topic" default="/kinect2/sd/image_color_rect" /> -->
+  <arg name="color_topic" default="/kinect2/remapped/sd/image_color_rect" />
 
   <!-- rostopic to subscribe for depth images -->
-  <arg name="depth_topic" default="/kinect2/remapped/qhd/image_depth_rect" />
+  <arg name="depth_topic" default="/kinect2/remapped/sd/image_depth_rect" />
   <!-- <arg name="depth_topic" default="/kinect2/qhd/image_depth_rect" /> -->
 
   <!-- rostopic to subscribe for camera calibration parameters -->
+  <!-- <arg name="cam_info_topic" default="/kinect2/sd/camera_info" /> -->
   <arg name="cam_info_topic" default="/kinect2/sd/camera_info" />
-  <!-- <arg name="cam_info_topic" default="/kinect2/qhd/camera_info" /> -->
 
   <!-- frame id for point cloud and 3D skeleton data -->
   <!-- in TAMS setup, we should add "head_mount_" -->
@@ -43,8 +43,8 @@ Date: 2019/11/23
 
   <include file="$(find ros_openpose)/launch/core.launch" >
     <arg name="print_keypoints" value="$(arg print_keypoints)" />
-    <arg name="pub_RightWristMsg" default="" />
-    <arg name="pub_HumanMsg" default="" />
+    <arg name="pub_RightWristMsg" value="$(arg pub_RightWristMsg)"/>
+    <arg name="pub_HumanMsg" value="$(arg pub_HumanMsg)"/>
     <arg name="no_depth" value="$(arg no_depth)" />
     <arg name="skeleton" value="$(arg skeleton)" />
     <arg name="frame_id" value="$(arg frame_id)" />
