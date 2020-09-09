@@ -35,6 +35,7 @@ namespace ros_openpose
   class CameraReader
   {
   private:
+    ros::Time mTime;
     cv::Mat mColorImage, mDepthImage;
     cv::Mat mColorImageUsed, mDepthImageUsed;
     std::string mColorTopic, mDepthTopic, mCamInfoTopic;
@@ -87,6 +88,12 @@ namespace ros_openpose
       return mFrameNumber;
     }
 
+
+    ros::Time getImageTime()
+    {
+      return mTime;
+    }
+
     // returns the latest color frame from camera
     // it locks the color frame. remember that we
     // are just passing the pointer instead of copying whole data
@@ -119,21 +126,19 @@ namespace ros_openpose
       mMutex.unlock();
     }
 
-    // compute the point in 3D space for a given pixel without considering distortion
+    // compute the point in 3D space by calucating the medium of the neighbour points for a given pixel without considering distortion
     void computeMedium3DPoint(const float pixelX, const float pixelY, float (&point)[3])
     {
-      // K.at(0) = intrinsic.fx
-      // K.at(4) = intrinsic.fy
-      // K.at(2) = intrinsic.ppx
-      // K.at(5) = intrinsic.ppy
       std::vector<float> points;
       float depth_;
 
-      for (int v = -50; v < 50; ++v)
+      for (int v = -15; v < 15; ++v)
       {
-          for (register int u = -50; u < 50; ++u)
+          for (int u = -15; u < 15; ++u)
           {
-            auto depth = mDepthImageUsed.at<unsigned short>(static_cast<int>(pixelY + v), static_cast<int>(pixelX + u));
+            int neighbor_v  = (pixelY + v >0) ? pixelY + v : 0;
+            int neighbor_u  = (pixelX + u >0) ? pixelX + u : 0;
+            auto depth = mDepthImageUsed.at<unsigned short>(static_cast<int>(neighbor_v), static_cast<int>(neighbor_u));
             depth_= (mDepthImageUsed.type() == 2) ? depth * 0.001f : depth;
             if (depth_ <= 0 || depth_ >2)
               continue;
@@ -142,30 +147,22 @@ namespace ros_openpose
       }
 
       if (!points.empty()){
-        if (points.size() % 2 == 0) {
-            const auto median_it1 = points.begin() + points.size() / 2 - 1;
-            const auto median_it2 = points.begin() + points.size() / 2;
+        const auto median_it = points.begin() + points.size() / 2;
+        std::nth_element(points.begin(), median_it , points.end());
+        depth_ =  *median_it;
 
-            std::nth_element(points.begin(), median_it1 , points.end());
-            const auto e1 = *median_it1;
-
-            std::nth_element(points.begin(), median_it2 , points.end());
-            const auto e2 = *median_it2;
-
-            depth_ = (e1 + e2) / 2;
-
-        } else {
-            const auto median_it = points.begin() + points.size() / 2;
-            std::nth_element(points.begin(), median_it , points.end());
-            depth_ =  *median_it;
-        }
+        auto x = (pixelX - mSPtrCameraInfo->K.at(2)) / mSPtrCameraInfo->K.at(0);
+        auto y = (pixelY - mSPtrCameraInfo->K.at(5)) / mSPtrCameraInfo->K.at(4);
+        point[0] = depth_ * x;
+        point[1] = depth_ * y;
+        point[2] = depth_;
       }
-
-      auto x = (pixelX - mSPtrCameraInfo->K.at(2)) / mSPtrCameraInfo->K.at(0);
-      auto y = (pixelY - mSPtrCameraInfo->K.at(5)) / mSPtrCameraInfo->K.at(4);
-      point[0] = depth_ * x;
-      point[1] = depth_ * y;
-      point[2] = depth_;
+      else
+      {
+        point[0] = 0;
+        point[1] = 0;
+        point[2] = 0;
+      }
     }
 
     // compute the point in 3D space for a given pixel without considering distortion

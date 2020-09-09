@@ -63,6 +63,8 @@ namespace ros_openpose
 
       auto depthPtr = cv_bridge::toCvCopy(depthMsg, sensor_msgs::image_encodings::TYPE_16UC1);
 
+      mTime = colorMsg->header.stamp;
+
       // it is very important to lock the below assignment operation.
       // remember that we are accessing it from another thread too.
       std::lock_guard<std::mutex> lock(mMutex);
