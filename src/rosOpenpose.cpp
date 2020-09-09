@@ -189,7 +189,7 @@ void pubRightWrist(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_
 
       // accesing each element of the keypoints
       const auto& poseKeypoints = datumsPtr->at(0)->poseKeypoints;
-      
+
       // if there is a person
       if (poseKeypoints.getSize(0) > 0)
       {
@@ -540,7 +540,7 @@ int main(int argc, char* argv[])
   ros::NodeHandle nh("~");
 
   // define the parameters, we are going to read
-  bool noDepth, printKeypoints, pubRightWristMsg, pubHumanMsg;
+  bool noDepth, printKeypoints, pubRightWristMsg, pubSkeleton;
   std::string colorTopic, depthTopic, camInfoTopic, frameId, pubTopic;
 
   // read the parameters from relative nodel handle
@@ -552,7 +552,7 @@ int main(int argc, char* argv[])
   nh.getParam("cam_info_topic", camInfoTopic);
   nh.param("print_keypoints", printKeypoints, false);
   nh.param("pub_RightWristMsg", pubRightWristMsg, false);
-  nh.param("pub_HumanMsg", pubHumanMsg, false);
+  nh.param("skeleton", pubSkeleton, false);
 
   if (pubTopic.empty())
   {
@@ -583,6 +583,8 @@ int main(int argc, char* argv[])
   {
     try
     {
+      ros::Time begin = ros::Time::now();
+
       auto frameNumber = cameraReader->getFrameNumber();
       if (frameNumber == 0 || frameNumber == 0ULL)
       {
@@ -593,17 +595,23 @@ int main(int argc, char* argv[])
       else
       {
         sPtrVecSPtrDatum datumToProcess = createDatum(cameraReader);
+
         bool successfullyEmplaced = opWrapper.waitAndEmplace(datumToProcess);
 
         sPtrVecSPtrDatum datumProcessed;
         if (successfullyEmplaced && opWrapper.waitAndPop(datumProcessed))
         {
-              if(pubHumanMsg)
+              if(pubSkeleton)
                 pubHuman(datumProcessed, cameraReader, framePublisher, noDepth);
               if (pubRightWristMsg && (!noDepth))
                 pubRightWrist(datumProcessed, cameraReader, handPublisher);
               if (printKeypoints)
                 printHumanKeypoints(datumProcessed);
+
+            ros::Time end = ros::Time::now();
+            std::cout << "time Duration " << end.toSec() - begin.toSec() << std::endl;
+            // pubHuman needs 0.01s, in total 0.04/0.05s
+            // if only pubRightWrist and no display, in total 0.034s
         }
         else
         {

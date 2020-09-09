@@ -9,7 +9,6 @@ Date: 2020/03/02
   <!-- note that the following parameters are going to assigned by other launch file upon call. -->
   <arg name="print_keypoints" default="" />
   <arg name="pub_RightWristMsg" default="" />
-  <arg name="pub_HumanMsg" default="" />
   <arg name="frame_id" default="" />
   <arg name="no_depth" default="" />
   <arg name="skeleton" default="" />
@@ -27,7 +26,7 @@ Date: 2020/03/02
   <node name="rosOpenpose" pkg="ros_openpose" type="rosOpenpose" output="screen" required="true" args="$(arg openpose_args)">
   <!-- <node name="original_rosOpenpose" pkg="ros_openpose" type="original_rosOpenpose" output="screen" required="true" args="$(arg openpose_args)"> -->
     <param name="pub_RightWristMsg" value="$(arg pub_RightWristMsg)" />
-    <param name="pub_HumanMsg" value="$(arg pub_HumanMsg)" />
+    <param name="skeleton" value="$(arg skeleton)" />
     <param name="print_keypoints" value="$(arg print_keypoints)" />
     <param name="frame_id" value="$(arg frame_id)" />
     <param name="no_depth" value="$(arg no_depth)" />
