@@ -113,7 +113,7 @@ void pubHuman(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_openp
             float point3D[3];
             // compute 3D point only if depth flag is set
             if (!noDepth)
-              sPtrCameraReader->compute3DPoint(x, y, point3D);
+              sPtrCameraReader->computeMedium3DPoint(x, y, point3D);
 
             mFrame.persons[person].bodyParts[bodyPart].pixel.x = x;
             mFrame.persons[person].bodyParts[bodyPart].pixel.y = y;
@@ -144,8 +144,8 @@ void pubHuman(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_openp
                 float point3DRight[3];
 
                 // compute 3D point only if depth flag is set
-                sPtrCameraReader->compute3DPoint(xLeft, yLeft, point3DLeft);
-                sPtrCameraReader->compute3DPoint(xRight, yRight, point3DRight);
+                sPtrCameraReader->computeMedium3DPoint(xLeft, yLeft, point3DLeft);
+                sPtrCameraReader->computeMedium3DPoint(xRight, yRight, point3DRight);
 
                 mFrame.persons[person].leftHandParts[handPart].pixel.x = xLeft;
                 mFrame.persons[person].leftHandParts[handPart].pixel.y = yLeft;
@@ -200,7 +200,6 @@ void pubRightWrist(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_
         auto person = 0;
         std_msgs::Float64MultiArray handmsg;
 
-        auto bodyPart = 4;
         //record the right and left wrist position
         std::vector<int> bodyParts{4, 7};
         for (auto bodyPart: bodyParts)
@@ -212,7 +211,7 @@ void pubRightWrist(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_
           const auto y = poseKeypoints[baseIndex + 1];
 
           float point3D[3];
-          sPtrCameraReader->compute3DPoint(x, y, point3D);
+          sPtrCameraReader->computeMedium3DPoint(x, y, point3D);
 
           // std::cout<< "right wrist, x: " << point3D[0] << "y: "<<  point3D[1] << "z: "<< point3D[2] <<std::endl;
           // std::cout<< "right wrist, pixel x: " << x << "y: "<<  y <<std::endl;
@@ -535,7 +534,7 @@ int main(int argc, char* argv[])
 {
   ros::init(argc, argv, "ros_openpose_node");
   //  have to use multiple threads, otherwise the cameraReader thread cannot work
-  ros::AsyncSpinner spinner(1);
+  ros::AsyncSpinner spinner(4);
   spinner.start();
   ros::NodeHandle nh("~");
 
@@ -583,9 +582,12 @@ int main(int argc, char* argv[])
   {
     try
     {
-      ros::Time begin = ros::Time::now();
+      // ros::Time begin = ros::Time::now();
 
       auto frameNumber = cameraReader->getFrameNumber();
+      // ros::Time image_kinect_time = cameraReader->getImageTime();
+      // ros::Time get_iamge_time = ros::Time::now();
+      // std::cout << "Image prepared to feed into : " << get_iamge_time.toSec() - image_kinect_time.toSec() << std::endl;
       if (frameNumber == 0 || frameNumber == 0ULL)
       {
         // display the error at most once per 10 seconds
@@ -608,8 +610,8 @@ int main(int argc, char* argv[])
               if (printKeypoints)
                 printHumanKeypoints(datumProcessed);
 
-            ros::Time end = ros::Time::now();
-            std::cout << "time Duration " << end.toSec() - begin.toSec() << std::endl;
+          // ros::Time end = ros::Time::now();
+          // std::cout << "Whole Openpose time " << end.toSec() - begin.toSec() << std::endl;
             // pubHuman needs 0.01s, in total 0.04/0.05s
             // if only pubRightWrist and no display, in total 0.034s
         }
