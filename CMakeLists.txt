@@ -126,3 +126,10 @@ target_link_libraries(testCameraReader
   ${OpenCV_LIBS}
   ${catkin_LIBRARIES}
 )
+
+add_executable(test1
+  src/test.cpp)
+
+target_link_libraries(test1
+  ${catkin_LIBRARIES}
+)
