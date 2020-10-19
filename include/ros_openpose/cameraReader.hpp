@@ -140,7 +140,7 @@ namespace ros_openpose
             int neighbor_u  = (pixelX + u >0) ? pixelX + u : 0;
             auto depth = mDepthImageUsed.at<unsigned short>(static_cast<int>(neighbor_v), static_cast<int>(neighbor_u));
             depth_= (mDepthImageUsed.type() == 2) ? depth * 0.001f : depth;
-            if (depth_ <= 0 || depth_ >2)
+            if (depth_ <= 0 || depth_ >3)
               continue;
             points.push_back(depth_);
           }
