@@ -81,7 +81,7 @@ class RealtimeVisualization():
         self.nose_id = 0
 
         # define a publisher to publish the 3D skeleton of multiple people
-        self.skeleton_pub = rospy.Publisher(self.ns, MarkerArray, queue_size=1)
+        self.skeleton_pub = rospy.Publisher(self.ns + "human_pose_frame", MarkerArray, queue_size=1)
 
         # define a subscriber to retrive tracked bodies
         rospy.Subscriber(frame_topic, Frame, self.frame_callback)

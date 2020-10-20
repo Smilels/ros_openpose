@@ -18,7 +18,7 @@ Date: 2019/11/23
   <arg name="pointcloud" default="false" />
 
   <!-- set this flag to invoke the visualization of the hands of the skeleton -->
-  <arg name="skeleton_hands" default="false" />
+  <arg name="skeleton_hands" default="ture" />
 
   <!--
    the standard openpose command-line arguments are also supported.
@@ -26,7 +26,7 @@ Date: 2019/11/23
   -->
 
   <!-- full path to the model dir of openpose -->
-  <arg name="openpose_args" value=" --model_folder /homeL/shuang/code/openpose/models/ --number_people_max 1"/>
+  <arg name="openpose_args" value=" --model_folder /homeL/shuang/code/openpose/models/ --hand --number_people_max 1"/>
 
   <!-- rostopic to publish the 3D skeleton data -->
   <arg name="pub_topic" default="/frame" />
