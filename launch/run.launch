@@ -18,7 +18,7 @@ Date: 2019/11/23
   <arg name="pointcloud" default="false" />
 
   <!-- set this flag to invoke the visualization of the hands of the skeleton -->
-  <arg name="skeleton_hands" default="ture" />
+  <arg name="skeleton_hands" default="false" />
 
   <!--
    the standard openpose command-line arguments are also supported.
@@ -26,7 +26,7 @@ Date: 2019/11/23
   -->
 
   <!-- full path to the model dir of openpose -->
-  <arg name="openpose_args" value=" --model_folder /homeL/shuang/code/openpose/models/ --hand --number_people_max 1"/>
+  <arg name="openpose_args" value=" --model_folder /homeL/shuang/code/openpose/models/ --number_people_max 1"/>
 
   <!-- rostopic to publish the 3D skeleton data -->
   <arg name="pub_topic" default="/frame" />
@@ -44,7 +44,10 @@ Date: 2019/11/23
   <arg name="print_keypoints" default="false" />
 
   <!-- flag to enable publishing the right wrist data -->
-  <arg name="pub_RightWristMsg" default="true" />
+  <arg name="pub_RightWristMsg" default="false" />
+
+  <!-- flag to enable publishing the right wrist data -->
+  <arg name="pub_SpineMsg" default="true" />
 
   <!-- republish the compressed topics -->
   <!-- using the compressed topics can increase the frequency-->
@@ -58,6 +61,7 @@ Date: 2019/11/23
     <arg name="rviz" value="$(arg rviz)" />
     <arg name="print_keypoints" value="$(arg print_keypoints)" />
     <arg name="pub_RightWristMsg" value="$(arg pub_RightWristMsg)" />
+    <arg name="pub_SpineMsg" value="$(arg pub_SpineMsg)" />
     <arg name="skeleton" value="$(arg skeleton)" />
     <arg name="pub_topic" value="$(arg pub_topic)" />
     <arg name="pointcloud" value="$(arg pointcloud)" />
