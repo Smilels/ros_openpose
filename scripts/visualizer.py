@@ -24,7 +24,7 @@ class RealtimeVisualization():
         self.skeleton_line_width = skeleton_line_width
 
         # define a few colors we are going to use later on
-        self.colors = [ColorRGBA(0.12, 0.63, 0.42, 1.00),
+        self.colors = [ColorRGBA(1, 1, 0, 1.00),
                        ColorRGBA(0.98, 0.30, 0.30, 1.00),
                        ColorRGBA(0.26, 0.09, 0.91, 1.00),
                        ColorRGBA(0.77, 0.44, 0.14, 1.00),

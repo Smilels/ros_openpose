@@ -190,14 +190,14 @@ void pubTrackPose(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_o
 
       // accesing each element of the keypoints
       const auto& poseKeypoints = datumsPtr->at(0)->poseKeypoints;
-      const auto& handKeypoints = datumsPtr->at(0)->handKeypoints;
+      // const auto& handKeypoints = datumsPtr->at(0)->handKeypoints;
 
       // if there is a person
       if (poseKeypoints.getSize(0) > 0)
       {
 
         const auto bodyPartCount = poseKeypoints.getSize(1);
-        const auto handPartCount = handKeypoints[0].getSize(1);
+        // const auto handPartCount = handKeypoints[0].getSize(1);
 
         // only dectect the right wrist of the first person
         auto person = 0;
@@ -222,23 +222,23 @@ void pubTrackPose(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_o
               handmsg.data.push_back(point);
         }
 
-        std::vector<int> handParts{0, 5, 9, 13, 17};
-        for (auto handPart: handParts)
-        {
-          const auto baseIndex = handKeypoints[0].getSize(2) * (person * handPartCount + handPart);
-
-          // right hand
-          const auto xRight = handKeypoints[1][baseIndex];
-          const auto yRight = handKeypoints[1][baseIndex + 1];
-
-          float point3DRight[3];
-
-          // compute 3D point only if depth flag is set
-          sPtrCameraReader->computeMedium3DPoint(xRight, yRight, point3DRight);
-
-          for (auto point: point3DRight)
-              handmsg.data.push_back(point);
-        }
+        // std::vector<int> handParts{0, 5, 9, 13, 17};
+        // for (auto handPart: handParts)
+        // {
+        //   const auto baseIndex = handKeypoints[0].getSize(2) * (person * handPartCount + handPart);
+        //
+        //   // right hand
+        //   const auto xRight = handKeypoints[1][baseIndex];
+        //   const auto yRight = handKeypoints[1][baseIndex + 1];
+        //
+        //   float point3DRight[3];
+        //
+        //   // compute 3D point only if depth flag is set
+        //   sPtrCameraReader->computeMedium3DPoint(xRight, yRight, point3DRight);
+        //
+        //   for (auto point: point3DRight)
+        //       handmsg.data.push_back(point);
+        // }
         mposePublisher.publish(handmsg);
       }
     }
@@ -268,13 +268,13 @@ void pubTrackPose_mframe(ros_openpose::Frame mFrame, const ros::Publisher& mpose
       handmsg.data.push_back(mFrame.persons[0].bodyParts[bodyPart].point.y);
       handmsg.data.push_back(mFrame.persons[0].bodyParts[bodyPart].point.z);
     }
-    std::vector<int> handParts{0, 5, 9, 13, 17};
-    for (auto handPart: handParts)
-    {
-      handmsg.data.push_back(mFrame.persons[0].rightHandParts[handPart].point.x);
-      handmsg.data.push_back(mFrame.persons[0].rightHandParts[handPart].point.y);
-      handmsg.data.push_back(mFrame.persons[0].rightHandParts[handPart].point.z);
-    }
+    // std::vector<int> handParts{0, 5, 9, 13, 17};
+    // for (auto handPart: handParts)
+    // {
+    //   handmsg.data.push_back(mFrame.persons[0].rightHandParts[handPart].point.x);
+    //   handmsg.data.push_back(mFrame.persons[0].rightHandParts[handPart].point.y);
+    //   handmsg.data.push_back(mFrame.persons[0].rightHandParts[handPart].point.z);
+    // }
     mposePublisher.publish(handmsg);
   }
   else

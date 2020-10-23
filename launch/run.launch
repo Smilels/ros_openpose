@@ -44,7 +44,7 @@ Date: 2019/11/23
   <arg name="print_keypoints" default="false" />
 
   <!-- flag to enable publishing the right wrist data -->
-  <arg name="pub_RightWristMsg" default="false" />
+  <arg name="pub_RightWristMsg" default="true" />
 
   <!-- flag to enable publishing the right wrist data -->
   <arg name="pub_SpineMsg" default="true" />
