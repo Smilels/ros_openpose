@@ -179,7 +179,7 @@ ros_openpose::Frame pubHuman(const sPtrVecSPtrDatum& datumsPtr, const std::share
   }
 }
 
-void pubTrackPose(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_openpose::CameraReader>& sPtrCameraReader, const ros::Publisher& mposePublisher)
+void pubPosition(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_openpose::CameraReader>& sPtrCameraReader, const ros::Publisher& mposePublisher)
 {
   try
   {
@@ -203,8 +203,8 @@ void pubTrackPose(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_o
         auto person = 0;
         std_msgs::Float64MultiArray handmsg;
 
-        //record the right and left wrist position
-        std::vector<int> bodyParts{4, 7};
+        //record the right and shoudler center(1) position
+        std::vector<int> bodyParts{4, 1};
         for (auto bodyPart: bodyParts)
         {
           // src:
@@ -255,13 +255,12 @@ void pubTrackPose(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_o
   }
 }
 
-
-void pubTrackPose_mframe(ros_openpose::Frame mFrame, const ros::Publisher& mposePublisher)
+void pubPosition_mframe(ros_openpose::Frame mFrame, const ros::Publisher& mposePublisher)
 {
   std_msgs::Float64MultiArray handmsg;
   if (mFrame.persons.size() > 0)
   {
-    std::vector<int> bodyParts{4, 7};
+    std::vector<int> bodyParts{4, 1};
     for (auto bodyPart: bodyParts)
     {
       handmsg.data.push_back(mFrame.persons[0].bodyParts[bodyPart].point.x);
@@ -275,79 +274,6 @@ void pubTrackPose_mframe(ros_openpose::Frame mFrame, const ros::Publisher& mpose
     //   handmsg.data.push_back(mFrame.persons[0].rightHandParts[handPart].point.y);
     //   handmsg.data.push_back(mFrame.persons[0].rightHandParts[handPart].point.z);
     // }
-    mposePublisher.publish(handmsg);
-  }
-  else
-  {
-    // display the error at most once per 10 seconds
-    ROS_WARN_THROTTLE(10, "Waiting for datum...");
-  }
-}
-
-void pubTrackSpine(const sPtrVecSPtrDatum& datumsPtr, const std::shared_ptr<ros_openpose::CameraReader>& sPtrCameraReader, const ros::Publisher& mposePublisher)
-{
-  try
-  {
-    if (datumsPtr != nullptr && !datumsPtr->empty())
-    {
-      // we use the latest depth image for computing point in 3D space
-      sPtrCameraReader->lockLatestDepthImage();
-
-      // accesing each element of the keypoints
-      const auto& poseKeypoints = datumsPtr->at(0)->poseKeypoints;
-      // if there is a person
-      if (poseKeypoints.getSize(0) > 0)
-      {
-        const auto bodyPartCount = poseKeypoints.getSize(1);
-
-        // only dectect the right wrist of the first person
-        auto person = 0;
-        std_msgs::Float64MultiArray handmsg;
-
-        //record the right and left wrist position
-        std::vector<int> bodyParts{1};
-        for (auto bodyPart: bodyParts)
-        {
-          // src:
-          // https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/output.md#keypoint-format-in-the-c-api
-          const auto baseIndex = poseKeypoints.getSize(2) * (person * bodyPartCount + bodyPart);
-          const auto x = poseKeypoints[baseIndex];
-          const auto y = poseKeypoints[baseIndex + 1];
-
-          float point3D[3];
-          sPtrCameraReader->computeMedium3DPoint(x, y, point3D);
-
-          // std::cout<< "right wrist, x: " << point3D[0] << "y: "<<  point3D[1] << "z: "<< point3D[2] <<std::endl;
-          // std::cout<< "right wrist, pixel x: " << x << "y: "<<  y <<std::endl;
-          for (auto point: point3D)
-              handmsg.data.push_back(point);
-        }
-
-        mposePublisher.publish(handmsg);
-      }
-    }
-    else
-    {
-      // display the error at most once per 10 seconds
-      ROS_WARN_THROTTLE(10, "Waiting for datum...");
-      std::this_thread::sleep_for(std::chrono::milliseconds{SLEEP_MS});
-    }
-  }
-  catch (const std::exception& e)
-  {
-    ROS_ERROR("Error %s at line number %d on function %s in file %s", e.what(), __LINE__, __FUNCTION__, __FILE__);
-  }
-}
-
-void pubTrackSpine_mframe(ros_openpose::Frame mFrame, const ros::Publisher& mposePublisher)
-{
-  std_msgs::Float64MultiArray handmsg;
-  if (mFrame.persons.size() > 0)
-  {
-    // shoulder position
-    handmsg.data.push_back(mFrame.persons[0].bodyParts[1].point.x);
-    handmsg.data.push_back(mFrame.persons[0].bodyParts[1].point.y);
-    handmsg.data.push_back(mFrame.persons[0].bodyParts[1].point.z);
     mposePublisher.publish(handmsg);
   }
   else
@@ -506,7 +432,7 @@ void configureOpenPose(op::Wrapper& opWrapper)
 
     // Initializing the user custom classes
     // auto wUserInput = std::make_shared<WUserInput>(cameraReader);
-    // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, posePublisher, cameraReader, frameId, noDepth, printKeypoints);
+    // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, rightWristPublisher, cameraReader, frameId, noDepth, printKeypoints);
     //
     // // Add custom processing
     // const auto workerInputOnNewThread = true;
@@ -690,10 +616,9 @@ int main(int argc, char* argv[])
 
   // the frame consists of the location of detected body parts of each person
   const ros::Publisher framePublisher = nh.advertise<ros_openpose::Frame>(pubTopic, 1);
-  const ros::Publisher posePublisher = nh.advertise<std_msgs::Float64MultiArray>("track_pose", 1);
-  const ros::Publisher spinePublisher = nh.advertise<std_msgs::Float64MultiArray>("track_shoulder", 1);
+  const ros::Publisher positionPublisher = nh.advertise<std_msgs::Float64MultiArray>("openpose_position", 1);
 
-  // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, posePublisher, cameraReader, frameId, noDepth);
+  // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, rightWristPublisher, cameraReader, frameId, noDepth);
 
   ROS_INFO("Starting ros_openpose...");
   op::Wrapper opWrapper{op::ThreadManagerMode::Asynchronous};
@@ -732,16 +657,12 @@ int main(int argc, char* argv[])
               {
                 ros_openpose::Frame mFrame = pubHuman(datumProcessed, cameraReader, framePublisher, noDepth);
                 if (pubTrackPoseMsg && (!noDepth))
-                  pubTrackPose_mframe(mFrame, posePublisher);
-                if (pubTrackSpineMsg && (!noDepth))
-                  pubTrackSpine_mframe(mFrame, spinePublisher);
+                  pubPosition_mframe(mFrame, rightWristPublisher);
               }
               else
               {
                 if (pubTrackPoseMsg && (!noDepth))
-                  pubTrackPose(datumProcessed, cameraReader, posePublisher);
-                if (pubTrackSpineMsg && (!noDepth))
-                  pubTrackSpine(datumProcessed, cameraReader, spinePublisher);
+                    pubPosition(datumProcessed, cameraReader, rightWristPublisher);
               }
               if (printKeypoints)
                 printHumanKeypoints(datumProcessed);
@@ -749,7 +670,7 @@ int main(int argc, char* argv[])
           // ros::Time end = ros::Time::now();
           // std::cout << "Whole Openpose time " << end.toSec() - begin.toSec() << std::endl;
             // pubHuman needs 0.01s, in total 0.04/0.05s
-            // if only pubTrackPose and no display, in total 0.034s
+            // if only pubPosition and no display, in total 0.034s
         }
         else
         {
