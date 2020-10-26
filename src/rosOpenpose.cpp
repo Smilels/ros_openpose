@@ -432,11 +432,7 @@ void configureOpenPose(op::Wrapper& opWrapper)
 
     // Initializing the user custom classes
     // auto wUserInput = std::make_shared<WUserInput>(cameraReader);
-<<<<<<< HEAD
-    // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, rightWristPublisher, cameraReader, frameId, noDepth, printKeypoints);
-=======
     // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, positionPublisher, cameraReader, frameId, noDepth, printKeypoints);
->>>>>>> d72109bca1ae6daf44e5ade854770fe1bb159c83
     //
     // // Add custom processing
     // const auto workerInputOnNewThread = true;
