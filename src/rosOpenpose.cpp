@@ -432,7 +432,11 @@ void configureOpenPose(op::Wrapper& opWrapper)
 
     // Initializing the user custom classes
     // auto wUserInput = std::make_shared<WUserInput>(cameraReader);
+<<<<<<< HEAD
     // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, rightWristPublisher, cameraReader, frameId, noDepth, printKeypoints);
+=======
+    // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, positionPublisher, cameraReader, frameId, noDepth, printKeypoints);
+>>>>>>> d72109bca1ae6daf44e5ade854770fe1bb159c83
     //
     // // Add custom processing
     // const auto workerInputOnNewThread = true;
@@ -618,7 +622,7 @@ int main(int argc, char* argv[])
   const ros::Publisher framePublisher = nh.advertise<ros_openpose::Frame>(pubTopic, 1);
   const ros::Publisher positionPublisher = nh.advertise<std_msgs::Float64MultiArray>("openpose_position", 1);
 
-  // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, rightWristPublisher, cameraReader, frameId, noDepth);
+  // auto wUserOutput = std::make_shared<WUserOutput>(framePublisher, positionPublisher, cameraReader, frameId, noDepth);
 
   ROS_INFO("Starting ros_openpose...");
   op::Wrapper opWrapper{op::ThreadManagerMode::Asynchronous};
@@ -657,12 +661,12 @@ int main(int argc, char* argv[])
               {
                 ros_openpose::Frame mFrame = pubHuman(datumProcessed, cameraReader, framePublisher, noDepth);
                 if (pubTrackPoseMsg && (!noDepth))
-                  pubPosition_mframe(mFrame, rightWristPublisher);
+                  pubPosition_mframe(mFrame, positionPublisher);
               }
               else
               {
                 if (pubTrackPoseMsg && (!noDepth))
-                    pubPosition(datumProcessed, cameraReader, rightWristPublisher);
+                    pubPosition(datumProcessed, cameraReader, positionPublisher);
               }
               if (printKeypoints)
                 printHumanKeypoints(datumProcessed);
